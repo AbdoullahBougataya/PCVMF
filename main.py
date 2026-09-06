@@ -1,137 +1,125 @@
 #!/usr/bin/env python3
-"""Main entry point for the Python Computer Vision Multiprocessing Framework."""
+"""
+Computer Vision Robotics Framework - Main Entry Point
+
+Orchestrates two independent Python processes:
+1. Computer Vision Process: Frame capture, CV pipeline, ZeroMQ IPC Publisher
+2. Main Application Process: Robotics controller, ZeroMQ IPC Subscriber
+
+Usage:
+    python main.py [--config config/default_config.yaml]
+"""
 
 import argparse
-import time
 import multiprocessing as mp
-from config import AppConfig, CVPipelineConfig, MainTaskConfig, IPCConfig
-from core.process_manager import ProcessManager
-from cv_pipeline import DummyVisionPipeline
-from main_task import SampleMainTask
+import os
+import signal
+import sys
+import time
+import yaml
+
+from src.common.logger import setup_logger
+from src.vision.process import run_vision_process
+from src.main_app.process import run_main_app_process
+
+logger = setup_logger("Orchestrator")
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Scalable Multiprocessing Computer Vision Framework Boilerplate"
-    )
-    parser.add_argument(
-        "--source",
-        type=str,
-        default="synthetic",
-        help="Input source: 'synthetic', camera index (e.g., '0'), or video path"
-    )
-    parser.add_argument(
-        "--fps",
-        type=float,
-        default=30.0,
-        help="Target processing FPS limit (default: 30.0)"
-    )
-    parser.add_argument(
-        "--width",
-        type=int,
-        default=640,
-        help="Frame width resolution (default: 640)"
-    )
-    parser.add_argument(
-        "--height",
-        type=int,
-        default=480,
-        help="Frame height resolution (default: 480)"
-    )
-    parser.add_argument(
-        "--show-preview",
-        action="store_true",
-        help="Display OpenCV live preview window in CV pipeline"
-    )
-    parser.add_argument(
-        "--duration",
-        type=float,
-        default=0.0,
-        help="Automatically stop after N seconds (0 for indefinite run)"
-    )
-    parser.add_argument(
-        "--queue-size",
-        type=int,
-        default=50,
-        help="Maximum IPC queue buffer size (default: 50)"
-    )
-    parser.add_argument(
-        "--main-hz",
-        type=float,
-        default=0.0,
-        help="Main task processing rate limit in Hz (0.0 for uncapped)"
-    )
-    parser.add_argument(
-        "--log-every",
-        type=int,
-        default=20,
-        help="Log every Nth frame in main task (default: 20)"
-    )
-    parser.add_argument(
-        "--stats-interval",
-        type=float,
-        default=5.0,
-        help="Frequency in seconds to print summary statistics (default: 5.0)"
-    )
-    return parser.parse_args()
+def load_config(config_path: str) -> dict:
+    """Loads YAML configuration file."""
+    if not os.path.exists(config_path):
+        logger.error(f"Configuration file not found at: {config_path}")
+        sys.exit(1)
+        
+    with open(config_path, "r") as f:
+        try:
+            config = yaml.safe_load(f)
+            logger.info(f"Loaded configuration from {config_path}")
+            return config
+        except Exception as e:
+            logger.error(f"Failed to parse YAML config file {config_path}: {e}")
+            sys.exit(1)
 
 
 def main():
-    # Force 'spawn' start method for cross-platform stability (CUDA & OpenCV friendly)
-    try:
-        mp.set_start_method("spawn", force=True)
-    except RuntimeError:
-        pass
+    parser = argparse.ArgumentParser(description="Computer Vision Robotics Multiprocess Framework")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="config/default_config.yaml",
+        help="Path to YAML configuration file (default: config/default_config.yaml)",
+    )
+    args = parser.parse_args()
 
-    args = parse_args()
+    config = load_config(args.config)
 
-    # Process camera source arg
-    source_val = args.source
-    if source_val.isdigit():
-        source_val = int(source_val)
+    # Use 'spawn' start method for clean, isolated process state (cross-platform best practice)
+    mp.set_start_method("spawn", force=True)
 
-    # Initialize configuration
-    config = AppConfig(
-        app_name="VisionMultiprocessingApp",
-        log_level="INFO",
-        cv_config=CVPipelineConfig(
-            source=source_val,
-            target_fps=args.fps,
-            width=args.width,
-            height=args.height,
-            show_preview=args.show_preview
-        ),
-        main_config=MainTaskConfig(
-            poll_timeout=0.1,
-            target_hz=args.main_hz,
-            log_interval=args.stats_interval,
-            log_every_n_frames=args.log_every
-        ),
-        ipc_config=IPCConfig(
-            max_queue_size=args.queue_size,
-            drop_when_full=True
-        )
+    # Inter-process stop signal event
+    stop_event = mp.Event()
+
+    # Create processes
+    logger.info("Initializing child processes...")
+    vision_process = mp.Process(
+        target=run_vision_process,
+        args=(config, stop_event),
+        name="VisionProcess",
     )
 
-    # Instantiate CV Pipeline and Main Task workers
-    cv_pipeline = DummyVisionPipeline(config.cv_config)
-    main_task = SampleMainTask(config.main_config)
+    main_app_process = mp.Process(
+        target=run_main_app_process,
+        args=(config, stop_event),
+        name="MainAppProcess",
+    )
 
-    # Initialize Process Manager
-    manager = ProcessManager(config, cv_pipeline, main_task)
+    def shutdown_handler(signum, frame):
+        sig_name = signal.Signals(signum).name
+        logger.info(f"Received signal {sig_name}. Initiating graceful shutdown...")
+        stop_event.set()
 
-    if args.duration > 0:
-        # Run for specified duration in background thread / timer
-        def auto_stopper():
-            time.sleep(args.duration)
-            manager.stop_event.set()
+    # Register signal handlers for graceful shutdown (Ctrl+C / SIGTERM)
+    signal.signal(signal.SIGINT, shutdown_handler)
+    signal.signal(signal.SIGTERM, shutdown_handler)
 
-        import threading
-        timer_thread = threading.Thread(target=auto_stopper, daemon=True)
-        timer_thread.start()
+    # Start processes
+    logger.info("Starting Vision Process...")
+    vision_process.start()
 
-    # Start processes and run loop until complete or interrupted
-    manager.run_until_complete()
+    logger.info("Starting Main Application Process...")
+    main_app_process.start()
+
+    logger.info("Both processes running smoothly. Press Ctrl+C to terminate.")
+
+    # Orchestrator monitoring loop
+    try:
+        while not stop_event.is_set():
+            # Check if any child process died unexpectedly
+            if not vision_process.is_alive():
+                logger.error("VisionProcess terminated unexpectedly! Shutting down system.")
+                stop_event.set()
+                break
+            if not main_app_process.is_alive():
+                logger.error("MainAppProcess terminated unexpectedly! Shutting down system.")
+                stop_event.set()
+                break
+
+            time.sleep(0.5)
+
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt caught in main orchestrator loop.")
+        stop_event.set()
+
+    # Gracefully join processes with timeout
+    logger.info("Waiting for processes to exit...")
+    for proc in [vision_process, main_app_process]:
+        proc.join(timeout=3.0)
+        if proc.is_alive():
+            logger.warning(f"Process {proc.name} did not exit in time. Forcefully terminating...")
+            proc.terminate()
+            proc.join()
+
+    logger.info("System shutdown complete.")
 
 
 if __name__ == "__main__":

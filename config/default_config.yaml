@@ -1,0 +1,51 @@
+# ==============================================================================
+# Computer Vision Robotics Framework Configuration
+# ==============================================================================
+
+# ZeroMQ Inter-Process Communication (IPC) settings
+ipc:
+  # ZeroMQ socket address (Linux IPC path)
+  endpoint: "ipc:///tmp/cv_telemetry.ipc"
+  # Standard topic names
+  topics:
+    telemetry: "vision/telemetry"
+    detections: "vision/detections"
+    status: "vision/status"
+  # High Water Mark (message queue depth) to avoid memory accumulation
+  sndhwm: 10
+  rcvhwm: 10
+
+# Computer Vision Process Settings
+vision:
+  camera:
+    # Source: 0 for default webcam, video file path, or "mock" for synthetic frame generation
+    source: "mock"
+    width: 640
+    height: 480
+    fps: 30
+
+  pipeline:
+    # Active pipeline class to load: e.g., "SampleColorTrackerPipeline"
+    name: "SampleColorTrackerPipeline"
+    target_color: "green"
+    min_area: 500
+
+  # High frequency target loop rate (Hz) for vision process
+  target_fps: 30
+
+  # Display OpenCV GUI debug window (set true to visualize frame feed & detections, false for headless mode)
+  show_window: true
+
+# Main Application / Robotics Control Process Settings
+main_app:
+  controller:
+    # Active controller class to load: e.g., "SampleRoboticsController"
+    name: "SampleRoboticsController"
+
+  # Robotics main control loop rate (Hz)
+  loop_rate_hz: 50
+
+# General Logging Settings
+logging:
+  level: "INFO"
+  format: "[%(asctime)s] [%(levelname)s] [%(processName)s/%(threadName)s] %(message)s"

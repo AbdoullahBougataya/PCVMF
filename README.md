@@ -1,329 +1,448 @@
-# Python Computer Vision Multiprocessing Framework
+# 🚀 Python Computer Vision Multiprocessing Framework
 
-A production-grade, highly scalable Python boilerplate framework designed for computer vision (CV) projects. This framework decouples heavy video ingestion and AI model inference from application business logic into isolated, concurrent processes using Python's `multiprocessing` library.
+A modular, scalable, and high-performance Python boilerplate framework engineered specifically for **Computer Vision (CV) based Robotics & Autonomous Systems**.
 
----
-
-## 💡 Why Multiprocessing in Python Computer Vision?
-
-Python's Global Interpreter Lock (GIL) prevents multiple native threads from executing Python bytecode simultaneously on separate CPU cores. In real-time computer vision applications:
-- Running video frame capture, deep learning inference (PyTorch/OpenCV/YOLO), business logic, database operations, and network APIs in a single thread causes **frame stuttering, high latency, and dropped video streams**.
-- Using `threading` still suffers from GIL contention during CPU-heavy pre-processing and post-processing.
-- **This Framework Solution**: Uses true multi-process execution (`multiprocessing`), bypassing the GIL completely. One process runs the CV pipeline on dedicated CPU/GPU compute, while a second process handles business logic, logging, database writes, and external communications without interfering with video processing.
+This framework solves the classic Python concurrency problem—where compute-heavy image processing blocks high-frequency motor control loops—by isolating the **Computer Vision Pipeline** and **Main Control Application** into **separate Python processes** communicating asynchronously over **ZeroMQ IPC (`ipc://`)**.
 
 ---
 
-## 🏛️ Architecture & Component Overview
+## 📋 Table of Contents
+1. [Executive Architectural Overview](#-executive-architectural-overview)
+2. [Key Features](#-key-features)
+3. [Deep-Dive Architecture & Data Flow](#-deep-dive-architecture--data-flow)
+4. [Directory Layout & File Responsibilities](#-directory-layout--file-responsibilities)
+5. [Configuration Reference (`config/default_config.yaml`)](#-configuration-reference)
+6. [Step-by-Step Usage Guide](#-step-by-step-usage-guide)
+7. [Extending the Framework](#-extending-the-framework)
+   - [Creating Custom Vision Pipelines](#1-creating-custom-vision-pipelines)
+   - [Creating Custom Robotics Controllers](#2-creating-custom-robotics-controllers)
+   - [Defining Custom IPC Message Schemas](#3-defining-custom-ipc-message-schemas)
+8. [Performance Tuning & Prioritization Guide](#-performance-tuning--prioritization-guide)
+   - [Prioritizing Ultra-Low Latency](#a-prioritizing-ultra-low-latency)
+   - [Prioritizing High Frame Rates (FPS)](#b-prioritizing-high-frame-rates-fps)
+   - [Scaling to Multi-Node Networked Systems (TCP)](#c-scaling-to-multi-node-networked-systems-tcp)
+   - [Scaling to Additional Parallel Processes](#d-scaling-to-additional-parallel-processes)
+9. [Troubleshooting & FAQs](#-troubleshooting--faqs)
+
+---
+
+## 🏗️ Executive Architectural Overview
 
 ```
-                        ┌───────────────────────────────────────────────┐
-                        │                 main.py                       │
-                        │        (Process Manager / Orchestrator)       │
-                        └───────────────────────┬───────────────────────┘
-                                                │
-                       ┌────────────────────────┴───────────────────────┐
-                       │                                                │
-         ┌─────────────▼──────────────┐                   ┌─────────────▼──────────────┐
-         │     CV Pipeline Process    │                   │      Main Task Process     │
-         │ (BaseVisionPipeline Worker)│                   │   (BaseMainTask Worker)    │
-         └─────────────┬──────────────┘                   └─────────────▲──────────────┘
-                       │                                                │
-                       │             IPC Queue (DataPacket)             │
-                       └────────────────────────────────────────────────┘
+                                  +---------------------------------------+
+                                  |               main.py                 |
+                                  |        (Process Orchestrator)         |
+                                  +-------------------+-------------------+
+                                                      |
+                             +------------------------+------------------------+
+                             |                                                 |
+                             v                                                 v
+              +------------------------------+                  +------------------------------+
+              |      Vision Process          |                  |         Main Process         |
+              |   (src/vision/process.py)    |                  |   (src/main_app/process.py)  |
+              +------------------------------+                  +------------------------------+
+              | - Camera Capture Abstraction |                  | - Robotics Control Loop /    |
+              |   (Physical / Synthetic Mock)|                  |   State Machine (50Hz)       |
+              | - BaseVisionPipeline Plugin  |                  | - BaseMainController Plugin  |
+              | - ZeroMQ IPC Publisher       |                  | - ZeroMQ IPC Subscriber      |
+              +--------------+---------------+                  +--------------^---------------+
+                             |                                                 |
+                             |       ZeroMQ IPC (ipc:///tmp/cv_telemetry.ipc) |
+                             +-------------------------------------------------+
 ```
 
-1. **CV Pipeline Process (`BaseVisionPipeline`)**:
-   - Handles frame acquisition (Webcams, RTSP streams, Video files, or Synthetic generators).
-   - Performs frame resizing, color transformations, and AI inference (OpenCV, PyTorch, MediaPipe, YOLO, TensorRT).
-   - Packages detection metadata, performance metrics, and optional processed frames into `DataPacket`s.
-   - Pushes packets into an IPC queue channel with backpressure control and frame-dropping metrics.
+### Problem Solved: Why Not Multithreading?
+Python's **Global Interpreter Lock (GIL)** prevents true parallel execution of CPU-bound threads. In robotics, running heavy vision tasks (like YOLO object detection, ArUco tracking, or color segmentation) in Python threads causes high latency spikes and starves motor/PID control loops.
 
-2. **Main Task Process (`BaseMainTask`)**:
-   - Continuously receives and dequeues `DataPacket`s.
-   - Executes domain-specific business rules (hardware actuation, webhooks, database writes, alert notifications).
-   - Configurable processing rate (`--main-hz`) and logging frequency (`--log-every`).
-   - Tracks metrics (packets processed, latency in ms, objects detected, queue depth).
-
-3. **Orchestrator (`ProcessManager`)**:
-   - Handles process creation (`spawn` start method for CUDA & OpenCV safety).
-   - Traps operating system termination signals (`SIGINT`, `SIGTERM`).
-   - Controls graceful shutdowns, ensuring no orphaned zombie processes or corrupted IPC queues remain.
+### Solution: Multi-Process Isolation + ZeroMQ IPC
+- **True Multi-Core Execution**: Operating System schedules `VisionProcess` and `MainAppProcess` on separate CPU cores.
+- **Zero-Lock IPC**: ZeroMQ inter-process sockets (`ipc://`) write directly to kernel memory buffers without Python GIL contention or queue locking overhead.
+- **ZeroMQ Context Isolation**: Every worker process instantiates its **own private `zmq.Context()`**. ZeroMQ contexts are **never shared across process boundaries**, guaranteeing thread safety and eliminating memory race conditions.
 
 ---
 
-## ⚡ Key Features
+## ✨ Key Features
 
-- **GIL Bypass**: Full multi-core CPU/GPU utilization via `multiprocessing.Process`.
-- **Non-blocking IPC Queue**: Custom `IPCChannel` queue wrapper preventing process locks.
-- **Configurable Backpressure & Frame-Dropping**: Automatically drops oldest frames when processing falls behind to maintain low real-time latency.
-- **Target Rate Limiting**: Independent target FPS for CV Pipeline and target Hz for Main Task.
-- **Process-Aware Logging**: Custom `FlushStreamHandler` ensuring real-time terminal output across un-pickled multiprocessing child boundaries.
-- **Graceful Emergency Teardown**: Intercepts `Ctrl+C` and system kill signals to release hardware resources safely.
-- **Modular Abstract Base Classes**: Standardized interfaces (`abc.ABC`) allowing effortless swapping of vision models or main logic.
+- ⚡ **Asynchronous ZeroMQ IPC**: High-throughput Pub/Sub messaging pattern (`ipc:///tmp/cv_telemetry.ipc`).
+- 📷 **Hardware Abstraction Layer (`CameraDevice`)**: Seamlessly switch between physical USB/CSI webcams, video files, or a built-in **synthetic mock frame generator** (for development without physical hardware).
+- 🧩 **Plugin Architecture**: Swap vision algorithms (`BaseVisionPipeline`) or robotics controllers (`BaseMainController`) dynamically via YAML config without modifying core process loops.
+- ⏱️ **Real-Time FPS & Latency Metrics**: Tracks frame processing times (ms) and actual frame rates (FPS) in published telemetry.
+- 🖥️ **Optional Debug GUI Window**: Configurable live OpenCV visualization with bounding boxes and centroid overlays (`vision.show_window`).
+- 🛑 **Robust Lifecycle & Signal Management**: Inter-process `multiprocessing.Event` traps `SIGINT` (Ctrl+C) and `SIGTERM`, ensuring clean process termination and ZMQ socket unbinding without zombie process leaks or stale lockfiles.
 
 ---
 
-## 📁 Repository Structure & Module Responsibilities
+## 🔄 Deep-Dive Architecture & Data Flow
 
-```text
+```
+[CameraDevice / Mock]
+         |
+    (BGR Frame)
+         v
+[BaseVisionPipeline] ---> [TargetDetections]
+                                 |
+                          (JSON Serialized)
+                                 |
+                       [ZMQPublisher (PUB)]
+                                 |
+                     (ipc:///tmp/cv_telemetry.ipc)
+                                 |
+                      [ZMQSubscriber (SUB)]
+                                 |
+                          (Deserialized)
+                                 |
+                       [BaseMainController] ---> [Motor / Motion Commands]
+```
+
+1. **Frame Capture**: `CameraDevice` reads the raw BGR frame from OpenCV or synthesizes a dynamic test target frame.
+2. **Inference**: `BaseVisionPipeline.process_frame()` processes the frame, extracting bounding boxes, centroid coordinates, and labels into `TargetDetection` objects.
+3. **Telemetry Serialization**: The vision worker constructs a `VisionTelemetry` dataclass (containing timestamp, frame ID, FPS, latency, and detections) and serializes it to JSON.
+4. **IPC Publish**: `ZMQPublisher` broadcasts the message over topic `vision/telemetry`.
+5. **IPC Receive**: `ZMQSubscriber` in the Main process receives the multipart message and deserializes it.
+6. **Controller Tick**: `BaseMainController.on_vision_telemetry()` updates state, and `BaseMainController.tick(dt)` executes periodic control logic (e.g. 50 Hz PID control loop).
+
+---
+
+## 📁 Directory Layout & File Responsibilities
+
+```
 framework/
-├── config.py                 # Centralized configuration dataclasses (AppConfig, CVPipelineConfig, MainTaskConfig, IPCConfig)
-├── main.py                   # Main application entry point with CLI parser and orchestrator setup
-├── requirements.txt          # Minimal framework dependencies (numpy, opencv-python, pytest)
-├── README.md                 # Framework documentation and user guide
-│
-├── core/                     # Core Framework Engine
-│   ├── __init__.py
-│   ├── base_pipeline.py      # Abstract Base Class for CV Pipeline worker
-│   ├── base_main_task.py     # Abstract Base Class for Main Task worker
-│   ├── ipc.py                # DataPacket dataclass and IPCChannel queue manager
-│   ├── process_manager.py    # Process lifecycle management & signal handling
-│   └── logger.py             # Process-aware real-time logging with stdout flushing
-│
-├── cv_pipeline/             # Computer Vision Pipeline Implementations
-│   ├── __init__.py
-│   └── dummy_cv_pipeline.py  # Sample CV pipeline with synthetic & OpenCV camera capture
-│
-├── main_task/                # Main Application Task Implementations
-│   ├── __init__.py
-│   └── sample_main_task.py   # Sample main task consuming vision results & metrics
-│
-└── tests/                    # Automated Test Suite
-    ├── __init__.py
-    ├── test_ipc.py           # Unit tests for queue IPC and packet serialization
-    └── test_framework.py     # Integration tests for process lifecycle & communication
+├── config/
+│   └── default_config.yaml         # Central YAML configuration settings
+├── src/
+│   ├── common/
+│   │   ├── ipc.py                  # ZMQPublisher & ZMQSubscriber process-isolated classes
+│   │   ├── messages.py             # Telemetry, Detection, & Status message schemas
+│   │   └── logger.py               # Multiprocess-aware logging formatter
+│   ├── vision/
+│   │   ├── base_pipeline.py        # Abstract interface for CV algorithms (BaseVisionPipeline)
+│   │   ├── camera.py               # Camera capture module (Physical camera & Synthetic mock)
+│   │   ├── process.py              # Vision worker process main loop & ZMQ Publisher
+│   │   └── pipelines/
+│   │       ├── __init__.py
+│   │       └── sample_pipeline.py  # Sample green blob tracker implementation
+│   └── main_app/
+│       ├── base_controller.py      # Abstract interface for control logic (BaseMainController)
+│       ├── process.py              # Main app worker process main loop & ZMQ Subscriber
+│       └── controllers/
+│           ├── __init__.py
+│           └── sample_controller.py# Sample robotics controller implementation
+├── tests/
+│   └── test_framework.py           # Automated multiprocess integration test
+├── main.py                         # Framework CLI & top-level process orchestrator
+├── requirements.txt                # Python dependencies
+└── README.md                       # Framework documentation
+```
+
+### Module Responsibilities:
+- **`main.py`**: Loads config, sets spawn start method, creates `multiprocessing.Event()`, launches worker processes, handles shutdown signals (`SIGINT`/`SIGTERM`), and monitors process health.
+- **`src/common/ipc.py`**: Encapsulates PyZMQ socket management. Creates a process-private `zmq.Context()` on initialization.
+- **`src/common/messages.py`**: Dataclass definitions for structured messaging (`VisionTelemetry`, `TargetDetection`, `VisionStatusMessage`).
+- **`src/vision/process.py`**: Executes the high-frequency camera capture and CV processing loop in a child process.
+- **`src/main_app/process.py`**: Executes the main robotics control loop at a fixed frequency (`loop_rate_hz`) in a child process.
+
+---
+
+## ⚙️ Configuration Reference
+
+All framework parameters are controlled via `config/default_config.yaml`:
+
+```yaml
+# ZeroMQ IPC Network Settings
+ipc:
+  endpoint: "ipc:///tmp/cv_telemetry.ipc"  # Linux IPC socket path
+  topics:
+    telemetry: "vision/telemetry"           # Main detection telemetry topic
+    detections: "vision/detections"          # Secondary detection topic
+    status: "vision/status"                # System pipeline status topic
+  sndhwm: 10                                # Send High Water Mark (prevents queue buildup)
+  rcvhwm: 10                                # Receive High Water Mark
+
+# Computer Vision Process Settings
+vision:
+  camera:
+    source: "mock"        # "mock" for synthetic test generator, 0 for webcam, or "video.mp4"
+    width: 640            # Frame capture width
+    height: 480           # Frame capture height
+    fps: 30               # Target camera frame rate
+  
+  pipeline:
+    name: "SampleColorTrackerPipeline" # Class name inside src/vision/pipelines/
+    target_color: "green"
+    min_area: 500         # Minimum area threshold for detection
+    
+  target_fps: 30          # Desired CV loop rate
+  show_window: false      # true = display live OpenCV GUI debug window; false = headless mode
+
+# Main Application / Robotics Controller Settings
+main_app:
+  controller:
+    name: "SampleRoboticsController"   # Class name inside src/main_app/controllers/
+  
+  loop_rate_hz: 50        # Control loop frequency in Hz (e.g. 50Hz = 20ms tick)
+
+# Logging Settings
+logging:
+  level: "INFO"           # DEBUG, INFO, WARNING, ERROR
+  format: "[%(asctime)s] [%(levelname)s] [%(processName)s] %(message)s"
 ```
 
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 Step-by-Step Usage Guide
 
 ### 1. Installation
-Install core requirements:
+Install requirements:
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Running the Default Application
-
-Run with synthetic frame generation (no physical camera required):
+### 2. Basic Execution
+Run the main orchestrator script:
 ```bash
 python main.py
 ```
-
-Run with camera index `0` at 30 FPS with an OpenCV live preview window:
-```bash
-python main.py --source 0 --fps 30 --show-preview
-```
-
-Run for a fixed duration of 10 seconds before auto-exiting:
-```bash
-python main.py --duration 10
-```
-
----
-
-## 🎛️ Complete Command Line Interface (CLI) Reference
-
-| Parameter | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `--source` | `str` | `"synthetic"` | Input source: `"synthetic"`, camera index (e.g. `"0"`), or video file path (`".mp4"`) |
-| `--fps` | `float` | `30.0` | Target processing FPS limit for CV pipeline (`0.0` for uncapped max speed) |
-| `--width` | `int` | `640` | Desired frame width resolution |
-| `--height` | `int` | `480` | Desired frame height resolution |
-| `--show-preview` | `flag` | `False` | Displays OpenCV `imshow` preview window in the CV process |
-| `--duration` | `float` | `0.0` | Run duration in seconds before automatic graceful stop (`0.0` for infinite) |
-| `--queue-size` | `int` | `50` | Maximum capacity of the IPC queue buffer |
-| `--main-hz` | `float` | `0.0` | Execution rate limit for the Main Task in Hz (`0.0` for uncapped) |
-| `--log-every` | `int` | `20` | Log frame details every Nth frame in the Main Task (`0` to disable) |
-| `--stats-interval` | `float` | `5.0` | Interval in seconds to output summary queue statistics |
-
----
-
-## 🎯 How to Tuning Framework Performance for Different Goals
-
-Depending on your application domain, you can configure the framework to prioritize **real-time latency**, **zero frame loss**, or **resource usage**:
-
-### Scenario 1: Prioritize Real-Time Ultra-Low Latency (Drones, Robotics, CCTV Tracking)
-- **Goal**: Minimize delay between frame capture and action execution. Old frames are useless.
-- **Configuration**:
-  - Set `--queue-size 1` or `--queue-size 5`.
-  - Ensure `drop_when_full = True` in `IPCConfig` (drops oldest queued frames).
-  - Do NOT pass raw image arrays inside `DataPacket.frame` unless necessary (pass bounding box metadata only).
-- **Command**:
-  ```bash
-  python main.py --source 0 --queue-size 2 --fps 30
-  ```
-
-### Scenario 2: Prioritize Zero Frame Loss (Video Analytics, Security Footage Archiving)
-- **Goal**: Process every single frame without skipping, even if processing slows down.
-- **Configuration**:
-  - Set `drop_when_full = False` in `IPCConfig`.
-  - Increase queue size (`--queue-size 200`).
-  - Set `--main-hz 0.0` so the main task consumes packets as fast as possible.
-- **Code snippet (`config.py`)**:
-  ```python
-  ipc_config = IPCConfig(max_queue_size=200, drop_when_full=False)
-  ```
-
-### Scenario 3: Prioritize Low CPU / Power Consumption (Edge Devices, Raspberry Pi)
-- **Goal**: Avoid overheating and conserve CPU cycles on resource-constrained hardware.
-- **Configuration**:
-  - Lower the CV pipeline FPS limit (`--fps 15.0`).
-  - Throttle Main Task execution (`--main-hz 5.0`).
-  - Increase frame log step (`--log-every 50`).
-- **Command**:
-  ```bash
-  python main.py --fps 15 --main-hz 5 --log-every 50
-  ```
-
-### Scenario 4: Prioritize Maximum AI Inference FPS (GPU PyTorch / YOLO)
-- **Goal**: Run deep learning models at maximum possible GPU frame rate.
-- **Configuration**:
-  - Set `--fps 0.0` (uncapped).
-  - Disable preview window (`--show-preview` omitted).
-  - Perform CUDA model loading in `setup()` inside the CV process.
-
----
-
-## 🛠️ Step-by-Step Extension Guide
-
-### 1. Creating a Custom Computer Vision Pipeline
-
-Create a new file under `cv_pipeline/` (e.g., `cv_pipeline/yolo_pipeline.py`), inherit from `BaseVisionPipeline`, and implement the required abstract methods:
-
-```python
-# cv_pipeline/yolo_pipeline.py
-import cv2
-import time
-import torch
-from typing import Optional
-from config import CVPipelineConfig
-from core.base_pipeline import BaseVisionPipeline
-from core.ipc import DataPacket
-
-class YoloVisionPipeline(BaseVisionPipeline):
-    """Custom CV Pipeline running YOLO object detection."""
-
-    def setup(self) -> None:
-        self.logger.info("Loading YOLOv8 PyTorch model...")
-        # Initialize video capture hardware
-        self.cap = cv2.VideoCapture(self.config.source if isinstance(self.config.source, int) else str(self.config.source))
-        # Load AI model
-        self.model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
-        self.model.to(self.config.device)
-
-    def process_frame(self, frame_id: int) -> Optional[DataPacket]:
-        ret, frame = self.cap.read()
-        if not ret or frame is None:
-            return None
-
-        # Resize if specified in config
-        if self.config.width and self.config.height:
-            frame = cv2.resize(frame, (self.config.width, self.config.height))
-
-        # Run AI Inference
-        results = self.model(frame)
-        detections = results.pandas().xyxy[0].to_dict(orient="records")
-
-        # Return structured DataPacket
-        return DataPacket(
-            frame_id=frame_id,
-            timestamp=time.time(),
-            data={"detections": detections, "count": len(detections)},
-            frame=frame if self.config.show_preview else None,
-            metadata={"device": self.config.device}
-        )
-
-    def teardown(self) -> None:
-        self.logger.info("Releasing camera resources...")
-        if hasattr(self, 'cap') and self.cap.isOpened():
-            self.cap.release()
-```
-
----
-
-### 2. Creating a Custom Main Application Task
-
-Create a new file under `main_task/` (e.g., `main_task/mqtt_logger_task.py`), inherit from `BaseMainTask`, and implement the abstract methods:
-
-```python
-# main_task/mqtt_logger_task.py
-from config import MainTaskConfig
-from core.base_main_task import BaseMainTask
-from core.ipc import DataPacket
-
-class MQTTLoggerTask(BaseMainTask):
-    """Custom Main Task publishing vision events to an MQTT Broker or Database."""
-
-    def setup(self) -> None:
-        self.logger.info("Connecting to Database / MQTT Broker...")
-        # Initialize database pool, MQTT client, or hardware serial connection
-        self.client = self._connect_mqtt()
-
-    def _connect_mqtt(self):
-        # Placeholder for MQTT / DB connection logic
-        return None
-
-    def handle_packet(self, packet: DataPacket) -> None:
-        detections = packet.data.get("detections", [])
-        count = packet.data.get("count", 0)
-
-        # Execute custom business logic rules
-        if count > 0:
-            self.logger.info(f"Target Detected at Frame #{packet.frame_id}! Detections: {count}")
-            # Example: Publish detection alert payload over network
-            # self.client.publish("vision/alerts", str(detections))
-
-    def teardown(self) -> None:
-        self.logger.info("Closing MQTT connections...")
-        # Graceful cleanup
-```
-
----
-
-### 3. Wiring Custom Components into `main.py`
-
-Update `main.py` to instantiate your custom pipeline and task:
-
-```python
-# main.py
-from cv_pipeline.yolo_pipeline import YoloVisionPipeline
-from main_task.mqtt_logger_task import MQTTLoggerTask
-
-def main():
-    config = AppConfig(...)
-    
-    # Instantiate custom components
-    cv_pipeline = YoloVisionPipeline(config.cv_config)
-    main_task = MQTTLoggerTask(config.main_config)
-
-    # Launch process manager
-    manager = ProcessManager(config, cv_pipeline, main_task)
-    manager.run_until_complete()
-```
-
----
-
-## 🧪 Running the Test Suite
-
-The project includes unit tests for the IPC channel and integration tests for process spawning.
-
-To run tests:
-```bash
-pytest tests/ -v
-```
-
-Expected output:
+Outputs from both processes will be logged to stdout:
 ```text
-============================= test session starts ==============================
-collected 5 items
-
-tests/test_framework.py::test_full_framework_multiprocessing_run PASSED  [ 20%]
-tests/test_ipc.py::test_data_packet_creation PASSED                      [ 40%]
-tests/test_ipc.py::test_ipc_channel_send_receive PASSED                  [ 60%]
-tests/test_ipc.py::test_ipc_channel_drop_when_full PASSED                [ 80%]
-tests/test_ipc.py::test_ipc_channel_timeout PASSED                       [100%]
-
-============================== 5 passed in 2.05s ===============================
+[11:47:08.901] [INFO] [MainAppProcess] CV Telemetry | Frame: #53 | FPS: 27.5 | Latency: 35.5ms | Target: green_target at (386, 130) | Offset Error: dx=+66, dy=-110
 ```
+
+### 3. Custom Configuration File
+Specify a custom YAML config file using `--config`:
+```bash
+python main.py --config config/my_robot_config.yaml
+```
+
+### 4. Stopping the Framework
+Press `Ctrl+C`. The orchestrator catches `SIGINT`, sets `stop_event`, cleanly closes ZeroMQ sockets, releases camera resources, and joins all processes.
+
+---
+
+## 🛠️ Extending the Framework
+
+### 1. Creating Custom Vision Pipelines
+
+To add a new vision model (e.g., YOLO object detector, ArUco marker tracker, or OpenCV optical flow):
+
+1. Create a new Python file in `src/vision/pipelines/` (e.g., `aruco_pipeline.py`).
+2. Subclass `BaseVisionPipeline` and implement `initialize()`, `process_frame()`, and `cleanup()`:
+
+```python
+# src/vision/pipelines/aruco_pipeline.py
+import cv2
+import numpy as np
+from typing import List, Tuple, Dict, Any
+from src.vision.base_pipeline import BaseVisionPipeline
+from src.common.messages import TargetDetection
+
+class ArucoMarkerPipeline(BaseVisionPipeline):
+    def initialize(self) -> bool:
+        self.dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+        self.parameters = cv2.aruco.DetectorParameters()
+        self.detector = cv2.aruco.ArucoDetector(self.dictionary, self.parameters)
+        return True
+
+    def process_frame(self, frame: np.ndarray, frame_id: int) -> Tuple[List[TargetDetection], str]:
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        corners, ids, _ = self.detector.detectMarkers(gray)
+        
+        detections = []
+        if ids is not None:
+            for marker_id, corner in zip(ids.flatten(), corners):
+                pts = corner[0]
+                cx = int(np.mean(pts[:, 0]))
+                cy = int(np.mean(pts[:, 1]))
+                x, y, w, h = cv2.boundingRect(pts.astype(np.int32))
+                
+                detections.append(TargetDetection(
+                    label=f"aruco_id_{marker_id}",
+                    confidence=1.0,
+                    bbox=[int(x), int(y), int(w), int(h)],
+                    centroid=[cx, cy],
+                    extra_attributes={"marker_id": int(marker_id)}
+                ))
+        
+        status = "OK" if len(detections) > 0 else "NO_MARKERS"
+        return detections, status
+
+    def cleanup(self):
+        pass
+```
+
+3. Update `config/default_config.yaml`:
+```yaml
+vision:
+  pipeline:
+    name: "ArucoMarkerPipeline"
+```
+
+---
+
+### 2. Creating Custom Robotics Controllers
+
+To add custom motor control logic, state machines, or ROS bridge nodes:
+
+1. Create a new Python file in `src/main_app/controllers/` (e.g., `diff_drive_controller.py`).
+2. Subclass `BaseMainController` and implement `initialize()`, `on_vision_telemetry()`, `tick()`, and `cleanup()`:
+
+```python
+# src/main_app/controllers/diff_drive_controller.py
+from typing import Dict, Any
+from src.main_app.base_controller import BaseMainController
+from src.common.messages import VisionTelemetry, VisionStatusMessage
+from src.common.logger import setup_logger
+
+logger = setup_logger("DiffDriveController")
+
+class DifferentialDriveController(BaseMainController):
+    def initialize(self) -> bool:
+        self.kp = 0.5
+        self.latest_telemetry = None
+        logger.info("DifferentialDriveController initialized.")
+        return True
+
+    def on_vision_telemetry(self, telemetry: VisionTelemetry):
+        self.latest_telemetry = telemetry
+
+    def on_vision_status(self, status_msg: VisionStatusMessage):
+        pass
+
+    def tick(self, dt: float):
+        if self.latest_telemetry is None or not self.latest_telemetry.detections:
+            # Stop motors if target lost
+            self.send_motor_command(0.0, 0.0)
+            return
+
+        # Target tracking calculation
+        target = self.latest_telemetry.detections[0]
+        cx, _ = target.centroid
+        error_x = cx - 320  # Frame center at 320px
+        
+        # Steering response
+        angular_vel = -self.kp * (error_x / 320.0)
+        linear_vel = 0.5  # m/s
+        
+        self.send_motor_command(linear_vel, angular_vel)
+
+    def send_motor_command(self, v: float, w: float):
+        logger.info(f"Robot Command -> Linear: {v:.2f} m/s | Angular: {w:.2f} rad/s")
+
+    def cleanup(self):
+        self.send_motor_command(0.0, 0.0)
+```
+
+3. Update `config/default_config.yaml`:
+```yaml
+main_app:
+  controller:
+    name: "DifferentialDriveController"
+```
+
+---
+
+### 3. Defining Custom IPC Message Schemas
+
+If your project requires sending raw depth maps, 3D point clouds, or pose vectors, add custom dataclasses to `src/common/messages.py`:
+
+```python
+@dataclass
+class Pose3DMessage:
+    timestamp: float
+    x: float
+    y: float
+    z: float
+    roll: float
+    pitch: float
+    yaw: float
+
+    def to_json(self) -> str:
+        return json.dumps(asdict(self))
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "Pose3DMessage":
+        return cls(**json.loads(json_str))
+```
+
+---
+
+## ⚡ Performance Tuning & Prioritization Guide
+
+### A. Prioritizing Ultra-Low Latency
+If your robot requires sub-10ms response times (e.g., high-speed drone tracking or reactive obstacle avoidance):
+
+1. **Disable Debug GUI Window**: Set `vision.show_window: false` in `default_config.yaml` to avoid OpenCV GUI render delays.
+2. **Reduce High Water Marks**: Set `sndhwm: 2` and `rcvhwm: 2` in `config/default_config.yaml` to discard stale visual frames immediately if processing slows.
+3. **Downscale Resolution**: Use lower resolution frames in `vision.camera` (`320x240` or `640x480`).
+4. **Use MsgPack or Protocol Buffers**: For large payloads, replace JSON serialization in `messages.py` with `msgpack` or PyArrow.
+
+---
+
+### B. Prioritizing High Frame Rates (FPS)
+If your application uses heavy deep learning models (YOLO / TensorRT):
+
+1. **Inference Threading**: Run GPU inference asynchronously inside `process_frame()`.
+2. **Decouple Camera Read**: `CameraDevice` can be expanded with an internal frame buffer thread so OpenCV frame capture never waits for model inference.
+3. **Adjust Target Loop Rate**: Increase `vision.target_fps` to `60` or `120` when using high-speed global shutter cameras.
+
+---
+
+### C. Scaling to Multi-Node Networked Systems (TCP)
+To separate the vision computer (e.g. NVIDIA Jetson mounted on a drone) from the ground control station or central robot controller:
+
+Change the ZeroMQ endpoint protocol in `config/default_config.yaml` from `ipc://` to `tcp://`:
+```yaml
+ipc:
+  # Bind on all interfaces on Jetson compute node (Port 5555)
+  endpoint: "tcp://0.0.0.0:5555"
+```
+On the receiving ground control node, set subscriber endpoint to the Jetson IP:
+```yaml
+ipc:
+  endpoint: "tcp://192.168.1.100:5555"
+```
+
+---
+
+### D. Scaling to Additional Parallel Processes
+To expand the framework to 3 or more processes (e.g. `LidarProcess`, `UIProcess`, `SLAMProcess`):
+
+Edit `main.py` and spawn additional `multiprocessing.Process` workers passing `(config, stop_event)`:
+
+```python
+lidar_process = mp.Process(
+    target=run_lidar_process,
+    args=(config, stop_event),
+    name="LidarProcess",
+)
+lidar_process.start()
+```
+
+---
+
+## ❓ Troubleshooting & FAQs
+
+### Q1: "Address already in use" or ZMQ bind errors on startup
+**Cause**: A previous crashed process left a stale socket file `/tmp/cv_telemetry.ipc`.  
+**Solution**: The framework automatically removes stale socket files in `ZMQPublisher.__init__`. If needed, manually remove the file: `rm /tmp/cv_telemetry.ipc`.
+
+---
+
+### Q2: "Can't touch ZMQ context created in parent process" exception
+**Cause**: Instantiating `zmq.Context()` in `main.py` before spawning child processes.  
+**Solution**: Always instantiate `ZMQPublisher` and `ZMQSubscriber` inside the process target function (`run_vision_process` / `run_main_app_process`).
+
+---
+
+### Q3: OpenCV camera fails to open (`/dev/video0`)
+**Cause**: Linux user permission issue for camera devices.  
+**Solution**: Add your Linux user to the `video` group:
+```bash
+sudo usermod -aG video $USER
+```
+Then log out and log back in.
+
+---
+
+## 📜 License & Citation
+
+Designed for scalable robotics research and computer vision engineering. Feel free to use and adapt for your project needs!

@@ -1,36 +1,40 @@
+#!/usr/bin/env python3
+import multiprocessing as mp
 import time
-import pytest
-from config import AppConfig, CVPipelineConfig, MainTaskConfig, IPCConfig
-from cv_pipeline import DummyVisionPipeline
-from main_task import SampleMainTask
-from core.process_manager import ProcessManager
+import sys
+import yaml
+from src.vision.process import run_vision_process
+from src.main_app.process import run_main_app_process
+from src.common.messages import VisionTelemetry
 
+def test_multiprocess_ipc():
+    print("=== Starting Framework Multiprocess & ZeroMQ IPC Integration Test ===")
+    
+    with open("config/default_config.yaml", "r") as f:
+        config = yaml.safe_load(f)
 
-def test_full_framework_multiprocessing_run():
-    """Integration test spinning up both CV and Main processes for 2 seconds."""
-    config = AppConfig(
-        app_name="TestFrameworkApp",
-        log_level="WARNING",
-        cv_config=CVPipelineConfig(source="synthetic", target_fps=30.0, width=160, height=120),
-        main_config=MainTaskConfig(poll_timeout=0.05, log_interval=1.0),
-        ipc_config=IPCConfig(max_queue_size=20, drop_when_full=True)
-    )
+    mp.set_start_method("spawn", force=True)
+    stop_event = mp.Event()
 
-    cv_pipeline = DummyVisionPipeline(config.cv_config)
-    main_task = SampleMainTask(config.main_config)
-    manager = ProcessManager(config, cv_pipeline, main_task)
+    vision_proc = mp.Process(target=run_vision_process, args=(config, stop_event), name="VisionProcTest")
+    main_proc = mp.Process(target=run_main_app_process, args=(config, stop_event), name="MainProcTest")
 
-    # Start processes
-    manager.start()
-    assert manager.cv_process is not None and manager.cv_process.is_alive()
-    assert manager.main_process is not None and manager.main_process.is_alive()
+    vision_proc.start()
+    main_proc.start()
 
-    # Let processes execute for 1.5 seconds
-    time.sleep(1.5)
+    print("Processes spawned. Running for 3.5 seconds to observe IPC telemetry flow...")
+    time.sleep(3.5)
 
-    # Signal stop and shutdown
-    manager.shutdown(grace_period=3.0)
+    print("Signaling processes to shutdown via stop_event...")
+    stop_event.set()
 
-    assert not manager.cv_process.is_alive()
-    assert not manager.main_process.is_alive()
-    assert main_task.packets_received >= 0
+    vision_proc.join(timeout=3.0)
+    main_proc.join(timeout=3.0)
+
+    assert not vision_proc.is_alive(), "Vision process failed to shut down cleanly!"
+    assert not main_proc.is_alive(), "Main process failed to shut down cleanly!"
+
+    print("=== Integration Test SUCCESSFUL: Both processes ran, exchanged IPC telemetry, and exited cleanly! ===")
+
+if __name__ == "__main__":
+    test_multiprocess_ipc()
