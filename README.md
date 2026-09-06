@@ -1,8 +1,8 @@
-# 🚀 Python Computer Vision Multiprocessing Framework
+# 🚀 PCVMF - Python Computer Vision Multiprocessing Framework
 
-A modular, scalable, and high-performance Python boilerplate framework engineered specifically for **Computer Vision (CV) based Robotics & Autonomous Systems**.
+**PCVMF** is a modular, scalable, and high-performance Python framework boilerplate engineered specifically for **Computer Vision (CV) based Robotics, Autonomous Systems, and Multi-Sensor Platforms**.
 
-This framework solves the classic Python concurrency problem—where compute-heavy image processing blocks high-frequency motor control loops—by isolating the **Computer Vision Pipeline** and **Main Control Application** into **separate Python processes** communicating asynchronously over **ZeroMQ IPC (`ipc://`)**.
+This framework solves the classic Python concurrency bottleneck—where heavy image processing blocks high-frequency motor control loops—by isolating the **Computer Vision Pipeline** and **Main Control Application** (plus optional sensor/device workers) into **independent Python processes** communicating asynchronously over **ZeroMQ IPC (`ipc://`)**.
 
 ---
 
@@ -14,14 +14,14 @@ This framework solves the classic Python concurrency problem—where compute-hea
 5. [Configuration Reference (`config/default_config.yaml`)](#-configuration-reference)
 6. [Step-by-Step Usage Guide](#-step-by-step-usage-guide)
 7. [Extending the Framework](#-extending-the-framework)
-   - [Creating Custom Vision Pipelines](#1-creating-custom-vision-pipelines)
-   - [Creating Custom Robotics Controllers](#2-creating-custom-robotics-controllers)
-   - [Defining Custom IPC Message Schemas](#3-defining-custom-ipc-message-schemas)
+   - [1. Creating Custom Vision Pipelines](#1-creating-custom-vision-pipelines)
+   - [2. Creating Custom Robotics Controllers](#2-creating-custom-robotics-controllers)
+   - [3. Defining Custom IPC Message Schemas](#3-defining-custom-ipc-message-schemas)
+   - [4. Scaling to Multi-Process Architectures (LiDAR, IMU, Web Dashboard)](#4-scaling-to-multi-process-architectures-lidar-imu-web-dashboard)
 8. [Performance Tuning & Prioritization Guide](#-performance-tuning--prioritization-guide)
    - [Prioritizing Ultra-Low Latency](#a-prioritizing-ultra-low-latency)
    - [Prioritizing High Frame Rates (FPS)](#b-prioritizing-high-frame-rates-fps)
    - [Scaling to Multi-Node Networked Systems (TCP)](#c-scaling-to-multi-node-networked-systems-tcp)
-   - [Scaling to Additional Parallel Processes](#d-scaling-to-additional-parallel-processes)
 9. [Troubleshooting & FAQs](#-troubleshooting--faqs)
 
 ---
@@ -52,10 +52,10 @@ This framework solves the classic Python concurrency problem—where compute-hea
 ```
 
 ### Problem Solved: Why Not Multithreading?
-Python's **Global Interpreter Lock (GIL)** prevents true parallel execution of CPU-bound threads. In robotics, running heavy vision tasks (like YOLO object detection, ArUco tracking, or color segmentation) in Python threads causes high latency spikes and starves motor/PID control loops.
+Python's **Global Interpreter Lock (GIL)** prevents true parallel execution of CPU-bound threads. In robotics, running heavy vision tasks (like YOLO object detection, ArUco tracking, or color segmentation) in Python threads causes latency spikes and starves motor/PID control loops.
 
 ### Solution: Multi-Process Isolation + ZeroMQ IPC
-- **True Multi-Core Execution**: Operating System schedules `VisionProcess` and `MainAppProcess` on separate CPU cores.
+- **True Multi-Core Execution**: Operating System schedules `VisionProcess` and `MainAppProcess` on separate physical CPU cores.
 - **Zero-Lock IPC**: ZeroMQ inter-process sockets (`ipc://`) write directly to kernel memory buffers without Python GIL contention or queue locking overhead.
 - **ZeroMQ Context Isolation**: Every worker process instantiates its **own private `zmq.Context()`**. ZeroMQ contexts are **never shared across process boundaries**, guaranteeing thread safety and eliminating memory race conditions.
 
@@ -106,7 +106,7 @@ Python's **Global Interpreter Lock (GIL)** prevents true parallel execution of C
 ## 📁 Directory Layout & File Responsibilities
 
 ```
-framework/
+PCVMF/
 ├── config/
 │   └── default_config.yaml         # Central YAML configuration settings
 ├── src/
@@ -145,7 +145,7 @@ framework/
 
 ## ⚙️ Configuration Reference
 
-All framework parameters are controlled via `config/default_config.yaml`:
+All PCVMF parameters are controlled via `config/default_config.yaml`:
 
 ```yaml
 # ZeroMQ IPC Network Settings
@@ -309,16 +309,13 @@ class DifferentialDriveController(BaseMainController):
 
     def tick(self, dt: float):
         if self.latest_telemetry is None or not self.latest_telemetry.detections:
-            # Stop motors if target lost
             self.send_motor_command(0.0, 0.0)
             return
 
-        # Target tracking calculation
         target = self.latest_telemetry.detections[0]
         cx, _ = target.centroid
         error_x = cx - 320  # Frame center at 320px
         
-        # Steering response
         angular_vel = -self.kp * (error_x / 320.0)
         linear_vel = 0.5  # m/s
         
@@ -365,6 +362,99 @@ class Pose3DMessage:
 
 ---
 
+### 4. Scaling to Multi-Process Architectures (LiDAR, IMU, Web Dashboard)
+
+PCVMF is designed to scale beyond two processes. In complex robotics systems, you may have multiple hardware devices or background tasks running concurrently:
+- **`VisionProcess`**: Camera acquisition and vision processing.
+- **`LidarProcess`**: LiDAR point-cloud obstacle scanning (3D/2D).
+- **`IMUSensorProcess`**: 9-DOF IMU accelerometer/gyroscope readings (100Hz+).
+- **`MainAppProcess`**: Sensor fusion state machine and motor control loop.
+- **`WebDashboardProcess`**: Real-time telemetry monitoring server (e.g. WebSocket/Flask).
+
+#### Multi-Process Architecture Diagram
+
+```
+                             +----------------------------------------+
+                             |                main.py                 |
+                             |         (Process Orchestrator)         |
+                             +-------------------+--------------------+
+                                                 |
+         +-------------------+-------------------+-------------------+-------------------+
+         |                   |                   |                   |                   |
+         v                   v                   v                   v                   v
++-----------------+ +-----------------+ +-----------------+ +-----------------+ +------------------+
+| Vision Process  | |  Lidar Process  | |   IMU Process   | |   Main Process  | | Web Dashboard    |
+| (ZMQ Pub: CV)   | | (ZMQ Pub: Lidar)| | (ZMQ Pub: IMU)  | | (ZMQ Sub: All)  | | (ZMQ Sub: Telem) |
++--------+--------+ +--------+--------+ +--------+--------+ +--------^--------+ +--------^---------+
+         |                   |                   |                   |                   |
+         +-------------------+---------+---------+-------------------+-------------------+
+                                       |
+                   ZeroMQ IPC Bus (ipc:///tmp/pcvmf_bus.ipc)
+                   Topics: "vision/telemetry", "lidar/scan", "imu/data"
+```
+
+#### Step-by-Step Guide to Adding a New Process (e.g. `LidarProcess`):
+
+1. **Create the Worker Script (`src/sensors/lidar_process.py`)**:
+   ```python
+   # src/sensors/lidar_process.py
+   import time
+   from multiprocessing.synchronize import Event
+   from typing import Dict, Any
+   from src.common.ipc import ZMQPublisher
+   from src.common.logger import setup_logger
+
+   logger = setup_logger("LidarProcess")
+
+   def run_lidar_process(config: Dict[str, Any], stop_event: Event):
+       endpoint = config.get("ipc", {}).get("endpoint", "ipc:///tmp/cv_telemetry.ipc")
+       publisher = ZMQPublisher(endpoint=endpoint)
+       logger.info("LiDAR Process started.")
+
+       try:
+           while not stop_event.is_set():
+               # Read LiDAR hardware sensor data...
+               scan_payload = '{"timestamp": %f, "min_distance_m": 0.45}' % time.time()
+               publisher.publish("lidar/scan", scan_payload)
+               time.sleep(0.05)  # 20 Hz scan rate
+       finally:
+           publisher.close()
+           logger.info("LiDAR Process shut down.")
+   ```
+
+2. **Subscribe to the New Topic in Main Controller (`src/main_app/process.py`)**:
+   Pass the new topic `"lidar/scan"` into `ZMQSubscriber`:
+   ```python
+   subscriber = ZMQSubscriber(
+       endpoint=endpoint,
+       topics=["vision/telemetry", "vision/status", "lidar/scan"],
+   )
+   ```
+
+3. **Register the New Process in `main.py`**:
+   ```python
+   # In main.py
+   from src.sensors.lidar_process import run_lidar_process
+
+   # Instantiate additional process
+   lidar_process = mp.Process(
+       target=run_lidar_process,
+       args=(config, stop_event),
+       name="LidarProcess",
+   )
+
+   # Start process
+   lidar_process.start()
+
+   # Include in graceful shutdown loop
+   for proc in [vision_process, main_app_process, lidar_process]:
+       proc.join(timeout=3.0)
+       if proc.is_alive():
+           proc.terminate()
+   ```
+
+---
+
 ## ⚡ Performance Tuning & Prioritization Guide
 
 ### A. Prioritizing Ultra-Low Latency
@@ -403,27 +493,11 @@ ipc:
 
 ---
 
-### D. Scaling to Additional Parallel Processes
-To expand the framework to 3 or more processes (e.g. `LidarProcess`, `UIProcess`, `SLAMProcess`):
-
-Edit `main.py` and spawn additional `multiprocessing.Process` workers passing `(config, stop_event)`:
-
-```python
-lidar_process = mp.Process(
-    target=run_lidar_process,
-    args=(config, stop_event),
-    name="LidarProcess",
-)
-lidar_process.start()
-```
-
----
-
 ## ❓ Troubleshooting & FAQs
 
 ### Q1: "Address already in use" or ZMQ bind errors on startup
 **Cause**: A previous crashed process left a stale socket file `/tmp/cv_telemetry.ipc`.  
-**Solution**: The framework automatically removes stale socket files in `ZMQPublisher.__init__`. If needed, manually remove the file: `rm /tmp/cv_telemetry.ipc`.
+**Solution**: PCVMF automatically removes stale socket files in `ZMQPublisher.__init__`. If needed, manually remove the file: `rm /tmp/cv_telemetry.ipc`.
 
 ---
 
@@ -445,4 +519,4 @@ Then log out and log back in.
 
 ## 📜 License & Citation
 
-Designed for scalable robotics research and computer vision engineering. Feel free to use and adapt for your project needs!
+PCVMF (Python Computer Vision Multiprocessing Framework) is designed for scalable robotics research, autonomous systems, and computer vision engineering.
