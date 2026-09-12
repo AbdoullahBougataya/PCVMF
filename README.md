@@ -47,7 +47,7 @@ This framework solves the classic Python concurrency bottleneck—where heavy im
               | - ZeroMQ IPC Publisher       |                  | - ZeroMQ IPC Subscriber      |
               +--------------+---------------+                  +--------------^---------------+
                              |                                                 |
-                             |       ZeroMQ IPC (ipc:///tmp/cv_telemetry.ipc) |
+                             |       ZeroMQ IPC (ipc:///tmp/pcvmf_bus.ipc)    |
                              +-------------------------------------------------+
 ```
 
@@ -63,7 +63,7 @@ Python's **Global Interpreter Lock (GIL)** prevents true parallel execution of C
 
 ## ✨ Key Features
 
-- ⚡ **Asynchronous ZeroMQ IPC**: High-throughput Pub/Sub messaging pattern (`ipc:///tmp/cv_telemetry.ipc`).
+- ⚡ **Asynchronous ZeroMQ IPC**: High-throughput Pub/Sub messaging pattern (`ipc:///tmp/pcvmf_bus.ipc`).
 - 📷 **Hardware Abstraction Layer (`CameraDevice`)**: Seamlessly switch between physical USB/CSI webcams, video files, or a built-in **synthetic mock frame generator** (for development without physical hardware).
 - 🧩 **Plugin Architecture**: Swap vision algorithms (`BaseVisionPipeline`) or robotics controllers (`BaseMainController`) dynamically via YAML config without modifying core process loops.
 - ⏱️ **Real-Time FPS & Latency Metrics**: Tracks frame processing times (ms) and actual frame rates (FPS) in published telemetry.
@@ -85,7 +85,7 @@ Python's **Global Interpreter Lock (GIL)** prevents true parallel execution of C
                                  |
                        [ZMQPublisher (PUB)]
                                  |
-                     (ipc:///tmp/cv_telemetry.ipc)
+                     (ipc:///tmp/pcvmf_bus.ipc)
                                  |
                       [ZMQSubscriber (SUB)]
                                  |
@@ -150,7 +150,7 @@ All PCVMF parameters are controlled via `config/default_config.yaml`:
 ```yaml
 # ZeroMQ IPC Network Settings
 ipc:
-  endpoint: "ipc:///tmp/cv_telemetry.ipc"  # Linux IPC socket path
+  endpoint: "ipc:///tmp/pcvmf_bus.ipc"  # Linux IPC socket path
   topics:
     telemetry: "vision/telemetry"           # Main detection telemetry topic
     detections: "vision/detections"          # Secondary detection topic
@@ -407,7 +407,7 @@ PCVMF is designed to scale beyond two processes. In complex robotics systems, yo
    logger = setup_logger("LidarProcess")
 
    def run_lidar_process(config: Dict[str, Any], stop_event: Event):
-       endpoint = config.get("ipc", {}).get("endpoint", "ipc:///tmp/cv_telemetry.ipc")
+       endpoint = config.get("ipc", {}).get("endpoint", "ipc:///tmp/pcvmf_bus.ipc")
        publisher = ZMQPublisher(endpoint=endpoint)
        logger.info("LiDAR Process started.")
 
@@ -496,8 +496,8 @@ ipc:
 ## ❓ Troubleshooting & FAQs
 
 ### Q1: "Address already in use" or ZMQ bind errors on startup
-**Cause**: A previous crashed process left a stale socket file `/tmp/cv_telemetry.ipc`.  
-**Solution**: PCVMF automatically removes stale socket files in `ZMQPublisher.__init__`. If needed, manually remove the file: `rm /tmp/cv_telemetry.ipc`.
+**Cause**: A previous crashed process left a stale socket file `/tmp/pcvmf_bus.ipc`.  
+**Solution**: PCVMF automatically removes stale socket files in `ZMQPublisher.__init__`. If needed, manually remove the file: `rm /tmp/pcvmf_bus.ipc`.
 
 ---
 

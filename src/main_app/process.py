@@ -35,7 +35,7 @@ def run_main_app_process(config: Dict[str, Any], stop_event: Event):
     main_cfg = config.get("main_app", {})
     ctrl_cfg = main_cfg.get("controller", {})
 
-    endpoint = ipc_cfg.get("endpoint", "ipc:///tmp/cv_telemetry.ipc")
+    endpoint = ipc_cfg.get("endpoint", "ipc:///tmp/pcvmf_bus.ipc")
     topic_telemetry = ipc_cfg.get("topics", {}).get("telemetry", "vision/telemetry")
     topic_status = ipc_cfg.get("topics", {}).get("status", "vision/status")
     loop_rate_hz = main_cfg.get("loop_rate_hz", 50)

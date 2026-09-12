@@ -5,7 +5,7 @@
 # ZeroMQ Inter-Process Communication (IPC) settings
 ipc:
   # ZeroMQ socket address (Linux IPC path)
-  endpoint: "ipc:///tmp/cv_telemetry.ipc"
+  endpoint: "ipc:///tmp/pcvmf_bus.ipc"
   # Standard topic names
   topics:
     telemetry: "vision/telemetry"
