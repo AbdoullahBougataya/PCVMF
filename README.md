@@ -48,7 +48,7 @@ This framework solves the classic Python concurrency bottleneck—where heavy im
               | - ZeroMQ IPC Publisher       |                  | - ZeroMQ IPC Subscriber      |
               +--------------+---------------+                  +--------------^---------------+
                              |                                                 |
-                             |       ZeroMQ IPC (ipc:///tmp/pcvmf_bus.ipc)    |
+                             |       ZeroMQ IPC (ipc:///tmp/pcvmf_bus.ipc)     |
                              +-------------------------------------------------+
 ```
 
