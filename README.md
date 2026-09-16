@@ -9,20 +9,21 @@ This framework solves the classic Python concurrency bottleneck—where heavy im
 ## 📋 Table of Contents
 1. [Executive Architectural Overview](#-executive-architectural-overview)
 2. [Key Features](#-key-features)
-3. [Deep-Dive Architecture & Data Flow](#-deep-dive-architecture--data-flow)
-4. [Directory Layout & File Responsibilities](#-directory-layout--file-responsibilities)
-5. [Configuration Reference (`config/default_config.yaml`)](#-configuration-reference)
-6. [Step-by-Step Usage Guide](#-step-by-step-usage-guide)
-7. [Extending the Framework](#-extending-the-framework)
+3. [Quick Start](#-quick-start)
+4. [Deep-Dive Architecture & Data Flow](#-deep-dive-architecture--data-flow)
+5. [Directory Layout & File Responsibilities](#-directory-layout--file-responsibilities)
+6. [Configuration Reference (`config/default_config.yaml`)](#-configuration-reference)
+7. [Step-by-Step Usage Guide](#-step-by-step-usage-guide)
+8. [Extending the Framework](#-extending-the-framework)
    - [1. Creating Custom Vision Pipelines](#1-creating-custom-vision-pipelines)
    - [2. Creating Custom Robotics Controllers](#2-creating-custom-robotics-controllers)
    - [3. Defining Custom IPC Message Schemas](#3-defining-custom-ipc-message-schemas)
    - [4. Scaling to Multi-Process Architectures (LiDAR, IMU, Web Dashboard)](#4-scaling-to-multi-process-architectures-lidar-imu-web-dashboard)
-8. [Performance Tuning & Prioritization Guide](#-performance-tuning--prioritization-guide)
+9. [Performance Tuning & Prioritization Guide](#-performance-tuning--prioritization-guide)
    - [Prioritizing Ultra-Low Latency](#a-prioritizing-ultra-low-latency)
    - [Prioritizing High Frame Rates (FPS)](#b-prioritizing-high-frame-rates-fps)
    - [Scaling to Multi-Node Networked Systems (TCP)](#c-scaling-to-multi-node-networked-systems-tcp)
-9. [Troubleshooting & FAQs](#-troubleshooting--faqs)
+10. [Troubleshooting & FAQs](#-troubleshooting--faqs)
 
 ---
 
@@ -69,6 +70,39 @@ Python's **Global Interpreter Lock (GIL)** prevents true parallel execution of C
 - ⏱️ **Real-Time FPS & Latency Metrics**: Tracks frame processing times (ms) and actual frame rates (FPS) in published telemetry.
 - 🖥️ **Optional Debug GUI Window**: Configurable live OpenCV visualization with bounding boxes and centroid overlays (`vision.show_window`).
 - 🛑 **Robust Lifecycle & Signal Management**: Inter-process `multiprocessing.Event` traps `SIGINT` (Ctrl+C) and `SIGTERM`, ensuring clean process termination and ZMQ socket unbinding without zombie process leaks or stale lockfiles.
+
+---
+
+## ⚡ Quick Start
+
+Test PCVMF in under two minutes using synthetic camera data (no physical hardware required):
+
+```bash
+# 1. Clone repository & navigate to directory
+git clone https://github.com/AbdoullahBougataya/PCVMF.git
+cd PCVMF
+
+# 2. Install requirements
+pip install -r requirements.txt
+
+# 3. Run framework orchestrator
+python main.py
+```
+
+> **Expected Console Output:** You will see real-time IPC telemetry logs from both processes running asynchronously over ZeroMQ:
+> ```text
+> [15:04:06.219] [INFO] [MainAppProcess] CV Telemetry | Frame: #160 | FPS: 21.8 | Latency: 36.8ms | Target: green_target at (125, 141) | Offset Error: dx=-195, dy=-99
+> [15:04:06.259] [INFO] [MainAppProcess] CV Telemetry | Frame: #161 | FPS: 21.8 | Latency: 36.9ms | Target: green_target at (120, 131) | Offset Error: dx=-200, dy=-109
+> ```
+> *Press `Ctrl+C` at any time to trigger a clean process shutdown.*
+
+### Run Automated Integration Tests
+
+To run the multiprocess & ZeroMQ IPC test suite:
+
+```bash
+pytest
+```
 
 ---
 
