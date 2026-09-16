@@ -20,8 +20,10 @@ RUN uv venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Install Python dependencies
-COPY requirements.txt .
+COPY pyproject.toml requirements.txt README.md ./
+COPY src ./src
 RUN uv pip install --no-cache -r requirements.txt
+
 
 # --- 2. Final Runtime Stage ---
 FROM python:3.12-slim
