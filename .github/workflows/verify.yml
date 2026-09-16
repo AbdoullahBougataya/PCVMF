@@ -7,9 +7,6 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
-env:
-  UV_SYSTEM_PYTHON: 1
-
 jobs:
   lint-and-format:
     name: Lint & Code Style
@@ -26,11 +23,8 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
-      - name: Create Virtual Environment
-        run: uv venv
-
       - name: Install Dependencies
-        run: uv pip install -e .[dev]
+        run: uv sync --extra dev --python 3.12
 
       - name: Check Formatting (Black)
         run: uv run black --check .
@@ -63,11 +57,8 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Create Virtual Environment
-        run: uv venv
-
       - name: Install Package and Dev Dependencies
-        run: uv pip install -e .[dev]
+        run: uv sync --extra dev --python ${{ matrix.python-version }}
 
       - name: Run Pytest
         run: uv run pytest

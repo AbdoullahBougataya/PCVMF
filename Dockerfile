@@ -20,7 +20,7 @@ RUN uv venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Install Python dependencies
-COPY pyproject.toml requirements.txt README.md ./
+COPY pyproject.toml requirements.txt ./
 COPY src ./src
 RUN uv pip install --no-cache -r requirements.txt
 
