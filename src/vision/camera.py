@@ -1,8 +1,9 @@
-import time
 import math
-import numpy as np
+import time
+
 import cv2
-from typing import Tuple, Union, Optional
+import numpy as np
+
 from src.common.logger import setup_logger
 
 logger = setup_logger("CameraDevice")
@@ -15,12 +16,18 @@ class CameraDevice:
     or synthetic mock frames for hardware-independent development.
     """
 
-    def __init__(self, source: Union[int, str] = "mock", width: int = 640, height: int = 480, target_fps: int = 30):
+    def __init__(
+        self,
+        source: int | str = "mock",
+        width: int = 640,
+        height: int = 480,
+        target_fps: int = 30,
+    ):
         self.source = source
         self.width = width
         self.height = height
         self.target_fps = target_fps
-        self.cap: Optional[cv2.VideoCapture] = None
+        self.cap: cv2.VideoCapture | None = None
         self.is_mock = str(source).lower() == "mock"
         self.start_time = time.time()
         self.frame_counter = 0
@@ -28,7 +35,9 @@ class CameraDevice:
     def open(self) -> bool:
         """Opens camera capture or initializes synthetic frame generator."""
         if self.is_mock:
-            logger.info(f"Initialized Synthetic Mock Camera ({self.width}x{self.height} @ {self.target_fps} FPS)")
+            logger.info(
+                f"Initialized Synthetic Mock Camera ({self.width}x{self.height} @ {self.target_fps} FPS)"
+            )
             return True
 
         # Open real OpenCV video source
@@ -48,7 +57,7 @@ class CameraDevice:
             logger.error(f"Error opening camera source {self.source}: {e}")
             return False
 
-    def read(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def read(self) -> tuple[bool, np.ndarray | None]:
         """Captures next frame. Returns (success_flag, numpy_frame_bgr)."""
         self.frame_counter += 1
 

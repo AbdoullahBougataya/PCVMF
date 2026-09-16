@@ -1,9 +1,11 @@
+from typing import Any
+
 import cv2
 import numpy as np
-from typing import List, Tuple, Dict, Any
-from src.vision.base_pipeline import BaseVisionPipeline
-from src.common.messages import TargetDetection
+
 from src.common.logger import setup_logger
+from src.common.messages import TargetDetection
+from src.vision.base_pipeline import BaseVisionPipeline
 
 logger = setup_logger("SamplePipeline")
 
@@ -14,7 +16,7 @@ class SampleColorTrackerPipeline(BaseVisionPipeline):
     Demonstrates contour detection, centroid calculation, and TargetDetection output.
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(config)
         self.min_area = config.get("min_area", 300)
         # Default HSV bounds for green target detection
@@ -22,10 +24,14 @@ class SampleColorTrackerPipeline(BaseVisionPipeline):
         self.upper_green = np.array([85, 255, 255])
 
     def initialize(self) -> bool:
-        logger.info(f"Initialized SampleColorTrackerPipeline (min_area={self.min_area})")
+        logger.info(
+            f"Initialized SampleColorTrackerPipeline (min_area={self.min_area})"
+        )
         return True
 
-    def process_frame(self, frame: np.ndarray, frame_id: int) -> Tuple[List[TargetDetection], str]:
+    def process_frame(
+        self, frame: np.ndarray, frame_id: int
+    ) -> tuple[list[TargetDetection], str]:
         if frame is None or frame.size == 0:
             return [], "EMPTY_FRAME"
 
@@ -41,7 +47,7 @@ class SampleColorTrackerPipeline(BaseVisionPipeline):
         # Find contours
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        detections: List[TargetDetection] = []
+        detections: list[TargetDetection] = []
         for cnt in contours:
             area = cv2.contourArea(cnt)
             if area >= self.min_area:

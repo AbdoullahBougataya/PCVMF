@@ -1,19 +1,20 @@
-import time
 import importlib
-import cv2
+import time
 from multiprocessing.synchronize import Event
-from typing import Dict, Any, Type
+from typing import Any
 
-from src.common.logger import setup_logger
+import cv2
+
 from src.common.ipc import ZMQPublisher
-from src.common.messages import VisionTelemetry, VisionStatusMessage
-from src.vision.camera import CameraDevice
+from src.common.logger import setup_logger
+from src.common.messages import VisionStatusMessage, VisionTelemetry
 from src.vision.base_pipeline import BaseVisionPipeline
+from src.vision.camera import CameraDevice
 
 logger = setup_logger("VisionProcess")
 
 
-def _load_pipeline_class(pipeline_name: str) -> Type[BaseVisionPipeline]:
+def _load_pipeline_class(pipeline_name: str) -> type[BaseVisionPipeline]:
     """Dynamically loads pipeline class from src.vision.pipelines."""
     try:
         module = importlib.import_module("src.vision.pipelines.sample_pipeline")
@@ -24,10 +25,10 @@ def _load_pipeline_class(pipeline_name: str) -> Type[BaseVisionPipeline]:
         raise RuntimeError(f"Could not load pipeline {pipeline_name}") from e
 
 
-def run_vision_process(config: Dict[str, Any], stop_event: Event):
+def run_vision_process(config: dict[str, Any], stop_event: Event):
     """
     Computer Vision Worker Process.
-    
+
     CRITICAL: This function runs inside the dedicated child process.
     ZeroMQ context and publisher sockets are created strictly within this function.
     """
@@ -56,7 +57,10 @@ def run_vision_process(config: Dict[str, Any], stop_event: Event):
 
     if not camera.open():
         logger.error("Camera initialization failed. Exiting vision process.")
-        publisher.publish(topic_status, VisionStatusMessage(time.time(), "ERROR", "Camera open failed").to_json())
+        publisher.publish(
+            topic_status,
+            VisionStatusMessage(time.time(), "ERROR", "Camera open failed").to_json(),
+        )
         publisher.close()
         return
 
@@ -72,8 +76,15 @@ def run_vision_process(config: Dict[str, Any], stop_event: Event):
         camera.release()
         return
 
-    logger.info(f"Vision process loop starting with pipeline: {pipeline_name} (show_window={show_window})")
-    publisher.publish(topic_status, VisionStatusMessage(time.time(), "RUNNING", f"Pipeline {pipeline_name} active").to_json())
+    logger.info(
+        f"Vision process loop starting with pipeline: {pipeline_name} (show_window={show_window})"
+    )
+    publisher.publish(
+        topic_status,
+        VisionStatusMessage(
+            time.time(), "RUNNING", f"Pipeline {pipeline_name} active"
+        ).to_json(),
+    )
 
     frame_id = 0
     fps_counter = 0
@@ -158,4 +169,3 @@ def run_vision_process(config: Dict[str, Any], stop_event: Event):
         camera.release()
         publisher.close()
         logger.info("Vision process shutdown complete.")
-

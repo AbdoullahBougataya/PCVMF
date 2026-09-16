@@ -16,11 +16,12 @@ import os
 import signal
 import sys
 import time
+
 import yaml
 
 from src.common.logger import setup_logger
-from src.vision.process import run_vision_process
 from src.main_app.process import run_main_app_process
+from src.vision.process import run_vision_process
 
 logger = setup_logger("Orchestrator")
 
@@ -30,7 +31,7 @@ def load_config(config_path: str) -> dict:
     if not os.path.exists(config_path):
         logger.error(f"Configuration file not found at: {config_path}")
         sys.exit(1)
-        
+
     with open(config_path, "r") as f:
         try:
             config = yaml.safe_load(f)
@@ -42,7 +43,9 @@ def load_config(config_path: str) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Computer Vision Robotics Multiprocess Framework")
+    parser = argparse.ArgumentParser(
+        description="Computer Vision Robotics Multiprocess Framework"
+    )
     parser.add_argument(
         "--config",
         type=str,
@@ -96,11 +99,15 @@ def main():
         while not stop_event.is_set():
             # Check if any child process died unexpectedly
             if not vision_process.is_alive():
-                logger.error("VisionProcess terminated unexpectedly! Shutting down system.")
+                logger.error(
+                    "VisionProcess terminated unexpectedly! Shutting down system."
+                )
                 stop_event.set()
                 break
             if not main_app_process.is_alive():
-                logger.error("MainAppProcess terminated unexpectedly! Shutting down system.")
+                logger.error(
+                    "MainAppProcess terminated unexpectedly! Shutting down system."
+                )
                 stop_event.set()
                 break
 
@@ -115,7 +122,9 @@ def main():
     for proc in [vision_process, main_app_process]:
         proc.join(timeout=3.0)
         if proc.is_alive():
-            logger.warning(f"Process {proc.name} did not exit in time. Forcefully terminating...")
+            logger.warning(
+                f"Process {proc.name} did not exit in time. Forcefully terminating..."
+            )
             proc.terminate()
             proc.join()
 

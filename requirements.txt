@@ -3,7 +3,15 @@
 -e .
 cffi==2.1.1 ; implementation_name == 'pypy'
     # via pyzmq
-numpy==2.5.3
+numpy==2.2.6 ; python_full_version < '3.11'
+    # via
+    #   opencv-python
+    #   pcvmf
+numpy==2.4.6 ; python_full_version == '3.11.*'
+    # via
+    #   opencv-python
+    #   pcvmf
+numpy==2.5.3 ; python_full_version >= '3.12'
     # via
     #   opencv-python
     #   pcvmf

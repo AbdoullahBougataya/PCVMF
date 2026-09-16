@@ -6,7 +6,7 @@ def setup_logger(name: str = "Framework", level: str = "INFO") -> logging.Logger
     """Configures and returns a process-aware logger instance."""
     logger = logging.getLogger(name)
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-    
+
     if not logger.handlers:
         handler = logging.StreamHandler(sys.stdout)
         formatter = logging.Formatter(
@@ -15,5 +15,5 @@ def setup_logger(name: str = "Framework", level: str = "INFO") -> logging.Logger
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-        
+
     return logger

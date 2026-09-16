@@ -1,27 +1,28 @@
-from dataclasses import dataclass, asdict, field
 import json
-import time
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 
 @dataclass
 class TargetDetection:
     """Represents a single detected object/target in frame coordinates."""
+
     label: str
     confidence: float
-    bbox: List[int]  # [x, y, width, height]
-    centroid: List[int]  # [x, y]
-    extra_attributes: Dict[str, Any] = field(default_factory=dict)
+    bbox: list[int]  # [x, y, width, height]
+    centroid: list[int]  # [x, y]
+    extra_attributes: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class VisionTelemetry:
     """Full telemetry message sent from CV pipeline to Main Application."""
+
     timestamp: float
     frame_id: int
     fps: float
     processing_time_ms: float
-    detections: List[TargetDetection]
+    detections: list[TargetDetection]
     status: str = "OK"
 
     def to_json(self) -> str:
@@ -40,6 +41,7 @@ class VisionTelemetry:
 @dataclass
 class VisionStatusMessage:
     """Pipeline state / error status notification message."""
+
     timestamp: float
     status: str
     message: str

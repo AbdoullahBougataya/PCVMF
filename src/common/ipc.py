@@ -8,8 +8,9 @@ where they will execute.
 """
 
 import os
+
 import zmq
-from typing import Optional, Tuple
+
 from src.common.logger import setup_logger
 
 logger = setup_logger("ZMQ_IPC")
@@ -33,7 +34,9 @@ class ZMQPublisher:
                 try:
                     os.remove(ipc_path)
                 except OSError as e:
-                    logger.warning(f"Could not remove stale IPC socket file {ipc_path}: {e}")
+                    logger.warning(
+                        f"Could not remove stale IPC socket file {ipc_path}: {e}"
+                    )
 
         self.socket.bind(self.endpoint)
         logger.info(f"ZMQ Publisher bound to {self.endpoint} (PID: {os.getpid()})")
@@ -41,7 +44,9 @@ class ZMQPublisher:
     def publish(self, topic: str, payload: str):
         """Publishes a multipart message: [topic, payload]."""
         try:
-            self.socket.send_multipart([topic.encode("utf-8"), payload.encode("utf-8")], flags=zmq.NOBLOCK)
+            self.socket.send_multipart(
+                [topic.encode("utf-8"), payload.encode("utf-8")], flags=zmq.NOBLOCK
+            )
         except zmq.Again:
             logger.warning(f"ZMQ Publisher queue full for topic: {topic}")
         except Exception as e:
@@ -82,9 +87,11 @@ class ZMQSubscriber:
             self.socket.setsockopt_string(zmq.SUBSCRIBE, topic)
 
         self.socket.connect(self.endpoint)
-        logger.info(f"ZMQ Subscriber connected to {self.endpoint} for topics {self.topics} (PID: {os.getpid()})")
+        logger.info(
+            f"ZMQ Subscriber connected to {self.endpoint} for topics {self.topics} (PID: {os.getpid()})"
+        )
 
-    def receive(self, timeout_ms: int = 100) -> Optional[Tuple[str, str]]:
+    def receive(self, timeout_ms: int = 100) -> tuple[str, str] | None:
         """
         Polls and receives next available multipart message [topic, payload].
         Returns (topic, payload) or None if timeout occurs.

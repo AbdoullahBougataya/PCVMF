@@ -1,7 +1,8 @@
-from typing import Dict, Any, Optional
-from src.main_app.base_controller import BaseMainController
-from src.common.messages import VisionTelemetry, VisionStatusMessage
+from typing import Any
+
 from src.common.logger import setup_logger
+from src.common.messages import VisionStatusMessage, VisionTelemetry
+from src.main_app.base_controller import BaseMainController
 
 logger = setup_logger("SampleController")
 
@@ -12,13 +13,15 @@ class SampleRoboticsController(BaseMainController):
     vision telemetry from ZeroMQ IPC to drive robot logic.
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(config)
-        self.latest_telemetry: Optional[VisionTelemetry] = None
+        self.latest_telemetry: VisionTelemetry | None = None
         self.target_lost_counter = 0
 
     def initialize(self) -> bool:
-        logger.info("SampleRoboticsController initialized. Ready to receive CV telemetry.")
+        logger.info(
+            "SampleRoboticsController initialized. Ready to receive CV telemetry."
+        )
         return True
 
     def on_vision_telemetry(self, telemetry: VisionTelemetry):
@@ -26,13 +29,17 @@ class SampleRoboticsController(BaseMainController):
         self.target_lost_counter = 0
 
     def on_vision_status(self, status_msg: VisionStatusMessage):
-        logger.info(f"Vision Status Update: [{status_msg.status}] - {status_msg.message}")
+        logger.info(
+            f"Vision Status Update: [{status_msg.status}] - {status_msg.message}"
+        )
 
     def tick(self, dt: float):
         """Periodic control loop calculation (e.g. 50Hz control tick)."""
         if self.latest_telemetry is None:
             self.target_lost_counter += 1
-            if self.target_lost_counter % 50 == 0:  # Print periodically if waiting for telemetry
+            if (
+                self.target_lost_counter % 50 == 0
+            ):  # Print periodically if waiting for telemetry
                 logger.info("Waiting for vision telemetry stream...")
             return
 
@@ -40,13 +47,15 @@ class SampleRoboticsController(BaseMainController):
         detections = telemetry.detections
 
         if not detections:
-            logger.debug("No targets detected by vision pipeline. Hovering / holding position.")
+            logger.debug(
+                "No targets detected by vision pipeline. Hovering / holding position."
+            )
             return
 
         # Process primary target detection
         primary = detections[0]
         cx, cy = primary.centroid
-        
+
         # Frame center reference (assuming 640x480 frame)
         error_x = cx - 320
         error_y = cy - 240

@@ -1,17 +1,17 @@
-import time
 import importlib
+import time
 from multiprocessing.synchronize import Event
-from typing import Dict, Any, Type
+from typing import Any
 
-from src.common.logger import setup_logger
 from src.common.ipc import ZMQSubscriber
-from src.common.messages import VisionTelemetry, VisionStatusMessage
+from src.common.logger import setup_logger
+from src.common.messages import VisionStatusMessage, VisionTelemetry
 from src.main_app.base_controller import BaseMainController
 
 logger = setup_logger("MainAppProcess")
 
 
-def _load_controller_class(controller_name: str) -> Type[BaseMainController]:
+def _load_controller_class(controller_name: str) -> type[BaseMainController]:
     """Dynamically loads controller class from src.main_app.controllers."""
     try:
         module = importlib.import_module("src.main_app.controllers.sample_controller")
@@ -22,10 +22,10 @@ def _load_controller_class(controller_name: str) -> Type[BaseMainController]:
         raise RuntimeError(f"Could not load controller {controller_name}") from e
 
 
-def run_main_app_process(config: Dict[str, Any], stop_event: Event):
+def run_main_app_process(config: dict[str, Any], stop_event: Event):
     """
     Main Application Worker Process.
-    
+
     CRITICAL: This function runs inside the dedicated child process.
     ZeroMQ context and subscriber sockets are created strictly within this function.
     """
@@ -59,7 +59,9 @@ def run_main_app_process(config: Dict[str, Any], stop_event: Event):
         subscriber.close()
         return
 
-    logger.info(f"Main App loop starting with controller: {controller_name} @ {loop_rate_hz} Hz")
+    logger.info(
+        f"Main App loop starting with controller: {controller_name} @ {loop_rate_hz} Hz"
+    )
 
     last_tick_time = time.time()
 
@@ -85,7 +87,9 @@ def run_main_app_process(config: Dict[str, Any], stop_event: Event):
                         status_msg = VisionStatusMessage.from_json(payload)
                         controller.on_vision_status(status_msg)
                 except Exception as e:
-                    logger.error(f"Error parsing received message on topic '{topic}': {e}")
+                    logger.error(
+                        f"Error parsing received message on topic '{topic}': {e}"
+                    )
 
             # Execute controller periodic logic tick
             controller.tick(dt)
@@ -97,7 +101,9 @@ def run_main_app_process(config: Dict[str, Any], stop_event: Event):
                 time.sleep(sleep_time)
 
     except Exception as e:
-        logger.error(f"Unhandled exception in main app process loop: {e}", exc_info=True)
+        logger.error(
+            f"Unhandled exception in main app process loop: {e}", exc_info=True
+        )
     finally:
         logger.info("Shutting down Main Application process...")
         try:

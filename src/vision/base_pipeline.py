@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
+from typing import Any
+
 import numpy as np
-from typing import List, Tuple, Dict, Any
+
 from src.common.messages import TargetDetection
 
 
@@ -10,7 +12,7 @@ class BaseVisionPipeline(ABC):
     Subclass this class to create custom vision algorithms for robotics tasks.
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         self.config = config
 
     @abstractmethod
@@ -19,10 +21,11 @@ class BaseVisionPipeline(ABC):
         Initialize models, cascade classifiers, ONNX runtimes, or color thresholds.
         Returns True if initialization succeeded.
         """
-        pass
 
     @abstractmethod
-    def process_frame(self, frame: np.ndarray, frame_id: int) -> Tuple[List[TargetDetection], str]:
+    def process_frame(
+        self, frame: np.ndarray, frame_id: int
+    ) -> tuple[list[TargetDetection], str]:
         """
         Processes a single input BGR image frame.
 
@@ -35,9 +38,7 @@ class BaseVisionPipeline(ABC):
                 - List of detected targets/objects in frame coordinates.
                 - Status string ("OK", "WARNING", "NO_TARGETS", "ERROR").
         """
-        pass
 
     @abstractmethod
     def cleanup(self):
         """Cleanup heavy resources, CUDA allocations, or model sessions."""
-        pass

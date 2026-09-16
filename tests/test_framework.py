@@ -1,23 +1,28 @@
 #!/usr/bin/env python3
 import multiprocessing as mp
 import time
-import sys
+
 import yaml
-from src.vision.process import run_vision_process
+
 from src.main_app.process import run_main_app_process
-from src.common.messages import VisionTelemetry
+from src.vision.process import run_vision_process
+
 
 def test_multiprocess_ipc():
     print("=== Starting Framework Multiprocess & ZeroMQ IPC Integration Test ===")
-    
+
     with open("config/default_config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
     mp.set_start_method("spawn", force=True)
     stop_event = mp.Event()
 
-    vision_proc = mp.Process(target=run_vision_process, args=(config, stop_event), name="VisionProcTest")
-    main_proc = mp.Process(target=run_main_app_process, args=(config, stop_event), name="MainProcTest")
+    vision_proc = mp.Process(
+        target=run_vision_process, args=(config, stop_event), name="VisionProcTest"
+    )
+    main_proc = mp.Process(
+        target=run_main_app_process, args=(config, stop_event), name="MainProcTest"
+    )
 
     vision_proc.start()
     main_proc.start()
@@ -34,7 +39,10 @@ def test_multiprocess_ipc():
     assert not vision_proc.is_alive(), "Vision process failed to shut down cleanly!"
     assert not main_proc.is_alive(), "Main process failed to shut down cleanly!"
 
-    print("=== Integration Test SUCCESSFUL: Both processes ran, exchanged IPC telemetry, and exited cleanly! ===")
+    print(
+        "=== Integration Test SUCCESSFUL: Both processes ran, exchanged IPC telemetry, and exited cleanly! ==="
+    )
+
 
 if __name__ == "__main__":
     test_multiprocess_ipc()

@@ -269,6 +269,7 @@ from typing import List, Tuple, Dict, Any
 from src.vision.base_pipeline import BaseVisionPipeline
 from src.common.messages import TargetDetection
 
+
 class ArucoMarkerPipeline(BaseVisionPipeline):
     def initialize(self) -> bool:
         self.dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
@@ -279,7 +280,7 @@ class ArucoMarkerPipeline(BaseVisionPipeline):
     def process_frame(self, frame: np.ndarray, frame_id: int) -> Tuple[List[TargetDetection], str]:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         corners, ids, _ = self.detector.detectMarkers(gray)
-        
+
         detections = []
         if ids is not None:
             for marker_id, corner in zip(ids.flatten(), corners):
@@ -287,15 +288,17 @@ class ArucoMarkerPipeline(BaseVisionPipeline):
                 cx = int(np.mean(pts[:, 0]))
                 cy = int(np.mean(pts[:, 1]))
                 x, y, w, h = cv2.boundingRect(pts.astype(np.int32))
-                
-                detections.append(TargetDetection(
-                    label=f"aruco_id_{marker_id}",
-                    confidence=1.0,
-                    bbox=[int(x), int(y), int(w), int(h)],
-                    centroid=[cx, cy],
-                    extra_attributes={"marker_id": int(marker_id)}
-                ))
-        
+
+                detections.append(
+                    TargetDetection(
+                        label=f"aruco_id_{marker_id}",
+                        confidence=1.0,
+                        bbox=[int(x), int(y), int(w), int(h)],
+                        centroid=[cx, cy],
+                        extra_attributes={"marker_id": int(marker_id)},
+                    )
+                )
+
         status = "OK" if len(detections) > 0 else "NO_MARKERS"
         return detections, status
 
@@ -328,6 +331,7 @@ from src.common.logger import setup_logger
 
 logger = setup_logger("DiffDriveController")
 
+
 class DifferentialDriveController(BaseMainController):
     def initialize(self) -> bool:
         self.kp = 0.5
@@ -349,10 +353,10 @@ class DifferentialDriveController(BaseMainController):
         target = self.latest_telemetry.detections[0]
         cx, _ = target.centroid
         error_x = cx - 320  # Frame center at 320px
-        
+
         angular_vel = -self.kp * (error_x / 320.0)
         linear_vel = 0.5  # m/s
-        
+
         self.send_motor_command(linear_vel, angular_vel)
 
     def send_motor_command(self, v: float, w: float):
@@ -439,6 +443,7 @@ PCVMF is designed to scale beyond two processes. In complex robotics systems, yo
    from src.common.logger import setup_logger
 
    logger = setup_logger("LidarProcess")
+
 
    def run_lidar_process(config: Dict[str, Any], stop_event: Event):
        endpoint = config.get("ipc", {}).get("endpoint", "ipc:///tmp/pcvmf_bus.ipc")
