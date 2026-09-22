@@ -195,6 +195,12 @@ cython_debug/
 #   Ignore directories containing user credentials, local state, and settings.
 #   Learn more at https://abstra.io/docs
 .abstra/
+.agents/
+
+# Codex
+# Codex is an Agentic AI coding tool.
+# Ignore unnecessary directories for this specific tool.
+.codex/
 
 # Visual Studio Code
 #   Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore that

@@ -1,0 +1,12 @@
+workers:
+  - name: vision
+    plugin:
+      class: pcvmf.workers:VisionWorker
+      options:
+        pipeline: {class: 'robot_plugins.vision:BrightPixelPipeline'}
+    publications: [vision/telemetry]
+  - name: controller
+    plugin: {class: 'pcvmf.workers:ControllerWorker'}
+    rate_hz: 50
+    subscriptions:
+      - {source: vision, topic: vision/telemetry}

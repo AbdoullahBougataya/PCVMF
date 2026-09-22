@@ -1,0 +1,13 @@
+codecs: ['robot_plugins.sensor:TemperatureCodec']
+workers:
+  - name: temperature
+    plugin: {class: 'robot_plugins.sensor:TemperatureWorker'}
+    publications: [sensor/temperature]
+    rate_hz: 10
+  - name: controller
+    plugin:
+      class: pcvmf.workers:ControllerWorker
+      options:
+        controller: {class: 'robot_plugins.sensor:TemperatureController'}
+    subscriptions:
+      - {source: temperature, topic: sensor/temperature, delivery: ordered}

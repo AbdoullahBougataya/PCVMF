@@ -1,54 +1,39 @@
-# GitLab CI/CD pipeline equivalent to .github/workflows/verify.yml
-
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
     - if: $CI_PIPELINE_SOURCE == "web"
-
-stages:
-  - lint
-  - test
-  - build
-
-default:
-  cache:
-    key: "$CI_COMMIT_REF_SLUG"
-    paths:
-      - .uv_cache/
-
+stages: [test, build]
 variables:
-  UV_CACHE_DIR: "$CI_PROJECT_DIR/.uv_cache"
-
-lint-and-format:
-  stage: lint
-  image: python:3.12-slim
-  before_script:
-    - pip install --no-cache-dir uv
-  script:
-    - uv sync --extra dev --python 3.12
-    - uv run black --check .
-    - uv run ruff check .
-
+  UV_CACHE_DIR: .uv_cache
+  PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
 test:
   stage: test
+  image: python:${PYTHON_VERSION}-slim
   parallel:
     matrix:
-      - PYTHON_VERSION: ["3.10", "3.11", "3.12"]
-  image: python:${PYTHON_VERSION}-slim
+      - PYTHON_VERSION: ['3.10', '3.11', '3.12']
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0
-    - pip install --no-cache-dir uv
+    - pip install uv
   script:
-    - uv sync --extra dev --python ${PYTHON_VERSION}
-    - uv run pytest
-
-docker-build:
+    - uv sync --frozen --extra dev
+    - uv run --frozen black --check .
+    - uv run --frozen ruff check .
+    - uv run --frozen pytest
+    - uv build
+    - uv venv /tmp/pcvmf-wheel
+    - uv pip install --python /tmp/pcvmf-wheel/bin/python -r requirements.txt dist/*.whl
+    - uv pip install --python /tmp/pcvmf-wheel/bin/python --no-deps ./examples/external_plugins
+    - /tmp/pcvmf-wheel/bin/python scripts/smoke.py
+    - /tmp/pcvmf-wheel/bin/python scripts/smoke.py --config examples/vision.yaml
+    - /tmp/pcvmf-wheel/bin/python scripts/smoke.py --config examples/sensor.yaml
+docker:
   stage: build
   image: docker:27
-  services:
-    - docker:27-dind
+  services: [docker:27-dind]
   variables:
-    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_CERTDIR: /certs
   script:
-    - docker build -t pcvmf:latest .
+    - docker build -t pcvmf:test .
+    - docker run --rm pcvmf:test python /opt/pcvmf-smoke.py
