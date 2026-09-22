@@ -4,16 +4,16 @@
 
 PCVMF runs computer vision, application control, and sensor workers in independent Python processes. Applications provide plugins and connect their publications through YAML. ZeroMQ carries typed JSON messages; a separate lifecycle channel supervises startup, progress, and shutdown.
 
-Version **0.3.0** introduces a breaking public API. See [migration notes](doc/how-to/migrate-to-0.3.md). Linux and Python 3.10–3.12 are tested. Scheduling is best-effort, not a hard real-time guarantee.
+Version **0.3.0** introduces a breaking public API. See [migration notes](docs/how-to/migrate-to-0.3.md). Linux and Python 3.10–3.12 are tested. Scheduling is best-effort, not a hard real-time guarantee.
 
 ## Documentation
 
-The [documentation hub](doc/README.md) organizes the full guide using Diátaxis:
+The [documentation hub](docs/README.md) organizes the full guide using Diátaxis:
 
-- [Tutorials](doc/tutorials/README.md): build a first application, an external detector, and a multi-sensor application.
-- [How-to guides](doc/how-to/README.md): use hardware, add sensors, test, embed, package, migrate, and troubleshoot.
-- [Reference](doc/reference/README.md): configuration, components, public APIs, messages, and CLI behavior.
-- [Explanation](doc/explanation/README.md): architecture, delivery and timing, lifecycle, and failure policy.
+- [Tutorials](docs/tutorials/README.md): build a first application, an external detector, and a multi-sensor application.
+- [How-to guides](docs/how-to/README.md): use hardware, add sensors, test, embed, package, migrate, and troubleshoot.
+- [Reference](docs/reference/README.md): configuration, components, public APIs, messages, and CLI behavior.
+- [Explanation](docs/explanation/README.md): architecture, delivery and timing, lifecycle, and failure policy.
 
 ## Quick start
 
@@ -53,7 +53,7 @@ uv run --frozen pcvmf config validate config/my_app.yaml
 uv run --frozen pcvmf run --config config/my_app.yaml
 ```
 
-A valid configuration prints `Valid configuration: 2 workers`. Edit `config/my_app.yaml` to change the image dimensions, pipeline options, or worker rates; the [configuration reference](doc/reference/configuration.md) describes each field. For detection offsets in the demo logs, change `logging.level` to `DEBUG`.
+A valid configuration prints `Valid configuration: 2 workers`. Edit `config/my_app.yaml` to change the image dimensions, pipeline options, or worker rates; the [configuration reference](docs/reference/configuration.md) describes each field. For detection offsets in the demo logs, change `logging.level` to `DEBUG`.
 
 ### Using pip instead of uv
 
@@ -132,7 +132,7 @@ The value may differ; the controller logs the first received reading once and th
 
 ### 4. Adapt an example for your project
 
-Use the vision example to replace image processing, or the sensor example to add a new data source and message type. Edit the plugin implementation, point your copied YAML at its `module:Class`, then validate and rerun it. Every published topic must appear in the worker's `publications`, and subscriptions must reference that worker and topic. See [Develop a plugin](#develop-a-plugin) and the [plugin guide](doc/reference/api.md) for the contracts.
+Use the vision example to replace image processing, or the sensor example to add a new data source and message type. Edit the plugin implementation, point your copied YAML at its `module:Class`, then validate and rerun it. Every published topic must appear in the worker's `publications`, and subscriptions must reference that worker and topic. See [Develop a plugin](#develop-a-plugin) and the [plugin guide](docs/reference/api.md) for the contracts.
 
 ## Connect workers
 
@@ -162,7 +162,7 @@ Each publisher owns its own endpoint. The runtime allocates a unique IPC directo
 
 Configuration is checked before processes start: unknown keys, invalid plugin types/options, duplicate names/endpoints, and missing publication references are errors. Plugin imports and validators must not acquire resources. Configuration files select Python code, so use trusted configuration and installed plugins.
 
-See the [configuration and lifecycle reference](doc/reference/configuration.md).
+See the [configuration and lifecycle reference](docs/reference/configuration.md).
 
 ## Develop a plugin
 
@@ -192,7 +192,7 @@ class MyPipeline(VisionPipeline):
 
 Supported contracts include `Worker`, `FrameSource`, `VisionPipeline`, `Controller`, `Visualizer`, `Publisher`, `Subscriber`, and `MessageCodec`. Constructors and validators must remain resource-free. Methods must return within the worker's configured timeouts.
 
-The [plugin guide](doc/reference/api.md) explains custom messages and component testing. For installation and runnable walkthroughs, see [How to use the examples](#how-to-use-the-examples).
+The [plugin guide](docs/reference/api.md) explains custom messages and component testing. For installation and runnable walkthroughs, see [How to use the examples](#how-to-use-the-examples).
 
 ## Embed and test
 

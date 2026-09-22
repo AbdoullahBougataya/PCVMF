@@ -1,9 +1,9 @@
 # Plugin documentation
 
-This documentation has moved to the [Diátaxis documentation hub](../doc/README.md). This page preserves the old link.
+This documentation has moved to the [Diátaxis documentation hub](README.md). This page preserves the old link.
 
-- [First vision plugin tutorial](../doc/tutorials/vision-plugin.md)
-- [Add a sensor and message type](../doc/how-to/add-sensor.md)
-- [Public API reference](../doc/reference/api.md)
-- [Message and codec reference](../doc/reference/messages.md)
-- [Component testing](../doc/how-to/testing.md)
+- [First vision plugin tutorial](tutorials/vision-plugin.md)
+- [Add a sensor and message type](how-to/add-sensor.md)
+- [Public API reference](reference/api.md)
+- [Message and codec reference](reference/messages.md)
+- [Component testing](how-to/testing.md)

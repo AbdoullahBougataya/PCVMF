@@ -1,8 +1,8 @@
 # Configuration documentation
 
-This documentation has moved to the [Diátaxis documentation hub](../doc/README.md). This page preserves the old link.
+This documentation has moved to the [Diátaxis documentation hub](README.md). This page preserves the old link.
 
-- [Configuration reference](../doc/reference/configuration.md)
-- [Built-in component options](../doc/reference/components.md)
-- [CLI and diagnostics](../doc/reference/cli.md)
-- [Lifecycle explanation](../doc/explanation/lifecycle.md)
+- [Configuration reference](reference/configuration.md)
+- [Built-in component options](reference/components.md)
+- [CLI and diagnostics](reference/cli.md)
+- [Lifecycle explanation](explanation/lifecycle.md)

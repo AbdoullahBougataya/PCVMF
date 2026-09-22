@@ -65,7 +65,7 @@ From `pcvmf.config`:
 
 From `pcvmf.runtime`:
 
-```python
+```text
 Application(config, *, on_event=None)
 ```
 
@@ -81,7 +81,7 @@ Application(config, *, on_event=None)
 
 From `pcvmf.runners`; these support dependency injection without sockets or processes. Constructor inputs are expected to be valid; YAML validation is not performed when constructing a runner directly.
 
-```python
+```text
 VisionRunner(
     source, pipeline, publisher, visualizer,
     *, source_id="vision", rate_hz=30, failure_limit=10,
@@ -91,7 +91,7 @@ VisionRunner(
 
 `initialize()` opens the source and initializes the pipeline. `step()` reads/processes/publishes/renders at most one frame and returns whether to continue. `cleanup()` attempts visualizer, pipeline, and source cleanup even after an earlier cleanup exception. It does not close the injected publisher. The runner does not sleep to enforce `rate_hz`; scheduling belongs to the worker runtime.
 
-```python
+```text
 ControllerRunner(
     controller, subscriber,
     *, deliveries=None, max_messages=100, receive_budget_ms=5,

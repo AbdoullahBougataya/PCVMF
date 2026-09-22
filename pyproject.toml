@@ -34,6 +34,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pcvmf"]
+exclude = [
+  "/.venv",
+  "/.uv_cache",
+]
 
 [tool.ruff]
 line-length = 120
