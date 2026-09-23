@@ -8,9 +8,20 @@ PCVMF 0.3.0 has a breaking API change; see the [0.2 to 0.3 migration guide](docs
 
 ## Quick start
 
-You need Linux, Python 3.10–3.12, and `uv`. Run these commands from the repository root, which contains `pyproject.toml`. The demo needs no camera, GPU, or graphical session.
+You need Linux, Git, Python 3.10–3.12, and `uv`. The demo needs no camera, GPU, or graphical session.
 
-### 1. Install the framework
+### 1. Download the framework
+
+Open a terminal in the directory where you want to keep the project, then clone the repository and enter it:
+
+```bash
+git clone https://github.com/AbdoullahBougataya/PCVMF.git
+cd PCVMF
+```
+
+Run the remaining commands from this `PCVMF` directory, which contains `pyproject.toml`. If you already cloned the repository, open a terminal in that directory and continue with installation.
+
+### 2. Install the framework
 
 ```bash
 uv sync --frozen --extra dev
@@ -18,7 +29,7 @@ uv sync --frozen --extra dev
 
 This creates `.venv` and installs PCVMF and its development tools. `uv run` uses that environment without activating it.
 
-### 2. Run the built-in demo
+### 3. Run the built-in demo
 
 ```bash
 uv run --frozen pcvmf run
@@ -34,7 +45,7 @@ Application ready: 2 workers
 
 The demo is headless and does not print every detection at the default INFO level. Press Ctrl+C to stop it before starting another example.
 
-### 3. Validate and run a configuration
+### 4. Validate and run a configuration
 
 ```bash
 cp config/default_config.yaml config/my_app.yaml
