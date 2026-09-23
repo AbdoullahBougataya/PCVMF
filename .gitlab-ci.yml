@@ -5,7 +5,7 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "web"
 stages: [test, build]
 variables:
-  UV_CACHE_DIR: .uv_cache
+  UV_CACHE_DIR: /tmp/pcvmf-uv-cache
   PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
 test:
   stage: test
