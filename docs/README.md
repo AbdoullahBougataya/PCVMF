@@ -2,8 +2,6 @@
 
 Documentation for **PCVMF 0.3.0**, the Linux-first Python framework for independently scheduled vision, controller, and sensor processes. Begin with the tutorials if this is your first application; use the other sections when you have a specific task or question.
 
-The organization follows [Diátaxis](https://diataxis.fr/): learning through tutorials, accomplishing tasks through how-to guides, looking up facts in reference material, and understanding design decisions through explanation.
-
 | Your goal | Start here |
 |---|---|
 | Run the framework for the first time | [Your first application](tutorials/first-application.md) |

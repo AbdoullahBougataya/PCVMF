@@ -1,6 +1,6 @@
 # Configuration documentation
 
-This documentation has moved to the [Diátaxis documentation hub](README.md). This page preserves the old link.
+This documentation has moved to the [documentation hub](README.md). This page preserves the old link.
 
 - [Configuration reference](reference/configuration.md)
 - [Built-in component options](reference/components.md)
