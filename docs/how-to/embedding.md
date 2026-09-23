@@ -6,7 +6,7 @@ Use the application runner when PCVMF is part of a larger Python program. The em
 
 ## Run a configuration from Python
 
-Save this as `run_robot.py` in your application directory:
+For this example, save `run_robot.py` in the PCVMF repository root and run the commands below from that directory:
 
 ```python
 import logging
@@ -45,7 +45,7 @@ if __name__ == "__main__":
 uv run --no-sync python run_robot.py
 ```
 
-This runs packaged defaults. Pass an explicit filename to `load_config()` to use your application configuration. Press Ctrl+C to request shutdown; the program returns the runtime's exit code.
+This runs packaged defaults. Pass an explicit filename to `load_config()` to use your application configuration. In your own package, run the script from an environment where PCVMF and its plugins are installed. Press Ctrl+C to request shutdown; the program returns the runtime's exit code.
 
 The main guard is required for multiprocessing spawn. Install signal handlers only in the main thread. If a host application already owns signals or runs PCVMF supervision in another thread, omit this handler setup and call `request_stop()` from the host's shutdown path.
 

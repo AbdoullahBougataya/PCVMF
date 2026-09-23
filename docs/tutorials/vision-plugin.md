@@ -12,7 +12,13 @@ Complete [your first application](first-application.md) first. All commands belo
 mkdir -p tutorial_plugins/my_robot
 ```
 
-Create an empty `tutorial_plugins/my_robot/__init__.py`. Create `tutorial_plugins/pyproject.toml` with:
+Create the package marker:
+
+```bash
+touch tutorial_plugins/my_robot/__init__.py
+```
+
+Create `tutorial_plugins/pyproject.toml` with:
 
 ```toml
 [build-system]
@@ -79,7 +85,7 @@ The detector finds the bounding rectangle and average position of pixels with a 
 uv pip install --python .venv/bin/python --no-deps --editable ./tutorial_plugins
 ```
 
-PCVMF is already installed, so `--no-deps` keeps this step focused on the plugin. Editable installation allows changes to your module to take effect the next time you start workers.
+PCVMF is already installed, so `--no-deps` keeps this step focused on the plugin. Editable installation allows changes to your module to take effect the next time you start workers. Use `uv run --no-sync` for the rest of this tutorial so `uv` keeps the separately installed package. If you later run `uv sync`, repeat this installation.
 
 ## 4. Select your detector
 

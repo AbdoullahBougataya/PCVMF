@@ -11,7 +11,7 @@ Implementation: [config.py](../../src/pcvmf/config.py), [plugins.py](../../src/p
 | `workers` | List of worker mappings | Required | Must contain at least one worker |
 | `codecs` | List of import-path strings | `[]` | Adds custom codecs to the two built-ins |
 | `hwm` | Integer | `100` | Positive send and receive high-water mark |
-| `logging` | Mapping | `{}` | Logging configuration applied in CLI and child processes |
+| `logging` | Mapping | `{}` (effective level `INFO`) | Logging configuration applied in CLI and child processes |
 
 Unknown application fields are rejected. Numeric rate/timeout values must be finite, strictly positive numbers; booleans are not accepted as numbers. Integer fields require actual integers.
 

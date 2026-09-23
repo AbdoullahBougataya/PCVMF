@@ -2,7 +2,7 @@
 
 [Documentation home](../README.md) · [How-to guides](README.md)
 
-Use this guide when adding a non-vision data source to an existing application. You need an installable application package and a controller that can consume the new payload. The [temperature example](../../examples/external_plugins/robot_plugins/sensor.py) is a complete implementation to copy into your own package and adapt.
+Use this guide when adding a non-vision data source to an existing application. You need the [quick-start environment](../../README.md#quick-start), an installable application package, and a controller that can consume the new payload. Run the commands below from the repository root. The [temperature example](../../examples/external_plugins/robot_plugins/sensor.py) is a complete implementation to copy into your own package and adapt.
 
 ## Define the payload and codec
 

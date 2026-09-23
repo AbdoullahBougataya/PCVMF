@@ -45,7 +45,7 @@ The subscriber checks exact `(source, topic)` routes after receipt, despite Zero
 | Field | Python type | Validation in the built-in telemetry codec |
 |---|---|---|
 | `label` | `str` | Nonempty |
-| `confidence` | `float` | Finite number from 0 to 1 |
+| `confidence` | `float` annotation | Finite number from 0 to 1; integer values also pass validation |
 | `bbox` | `list[int]` | Exactly `[x, y, width, height]`; width/height nonnegative |
 | `centroid` | `list[int]` | Exactly `[x, y]` |
 | `extra_attributes` | `dict[str, Any]` | Mapping; defaults to `{}` in Python |

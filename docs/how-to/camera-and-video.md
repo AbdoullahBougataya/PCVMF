@@ -2,7 +2,7 @@
 
 [Documentation home](../README.md) · [How-to guides](README.md)
 
-Use this guide to replace synthetic input while keeping your pipeline and controller. You need an installed PCVMF environment and, for a webcam, an accessible OpenCV camera device.
+Use this guide to replace synthetic input while keeping your pipeline and controller. You need the [quick-start environment](../../README.md#quick-start) and, for a webcam, an accessible OpenCV camera device. Run commands from the repository root. `uv run --no-sync` preserves a separately installed pipeline plugin if your configuration uses one.
 
 ## Use a webcam
 

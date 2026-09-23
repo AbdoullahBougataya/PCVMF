@@ -2,22 +2,13 @@
 
 # PCVMF
 
-PCVMF runs computer vision, application control, and sensor workers in independent Python processes. Applications provide plugins and connect their publications through YAML. ZeroMQ carries typed JSON messages; a separate lifecycle channel supervises startup, progress, and shutdown.
+PCVMF runs computer vision, controller, and sensor workers in separate Python processes. Application developers install their own plugins and connect workers with YAML. ZeroMQ carries typed JSON messages, while a separate channel supervises startup, progress, and shutdown.
 
-Version **0.3.0** introduces a breaking public API. See [migration notes](docs/how-to/migrate-to-0.3.md). Linux and Python 3.10–3.12 are tested. Scheduling is best-effort, not a hard real-time guarantee.
-
-## Documentation
-
-The [documentation hub](docs/README.md) organizes the full guide using Diátaxis:
-
-- [Tutorials](docs/tutorials/README.md): build a first application, an external detector, and a multi-sensor application.
-- [How-to guides](docs/how-to/README.md): use hardware, add sensors, test, embed, package, migrate, and troubleshoot.
-- [Reference](docs/reference/README.md): configuration, components, public APIs, messages, and CLI behavior.
-- [Explanation](docs/explanation/README.md): architecture, delivery and timing, lifecycle, and failure policy.
+PCVMF 0.3.0 has a breaking API change; see the [0.2 to 0.3 migration guide](docs/how-to/migrate-to-0.3.md). Linux and Python 3.10–3.12 are tested. Scheduling is best-effort, and the publish/subscribe transport does not guarantee message delivery.
 
 ## Quick start
 
-You need Linux, Python 3.10–3.12, and `uv` for the commands below. Open a terminal in the repository root (the directory containing `pyproject.toml`). No camera, GPU, or desktop session is required.
+You need Linux, Python 3.10–3.12, and `uv`. Run these commands from the repository root, which contains `pyproject.toml`. The demo needs no camera, GPU, or graphical session.
 
 ### 1. Install the framework
 
@@ -25,7 +16,7 @@ You need Linux, Python 3.10–3.12, and `uv` for the commands below. Open a term
 uv sync --frozen --extra dev
 ```
 
-This creates the project virtual environment and installs PCVMF with its development tools. You do not need to activate the environment when using `uv run`.
+This creates `.venv` and installs PCVMF and its development tools. `uv run` uses that environment without activating it.
 
 ### 2. Run the built-in demo
 
@@ -33,7 +24,7 @@ This creates the project virtual environment and installs PCVMF with its develop
 uv run --frozen pcvmf run
 ```
 
-The demo starts two workers: a vision pipeline tracking a moving synthetic target, and a controller receiving its detections. Look for these messages in the logs (worker readiness order may vary):
+The demo starts a synthetic vision worker and a controller. Look for these log messages; worker readiness order may vary:
 
 ```text
 Worker vision ready
@@ -41,11 +32,9 @@ Worker controller ready
 Application ready: 2 workers
 ```
 
-The default demo runs headlessly, so no window opens. It does not print every detection at the default INFO log level. **Press Ctrl+C to stop** before starting another example.
+The demo is headless and does not print every detection at the default INFO level. Press Ctrl+C to stop it before starting another example.
 
-### 3. Run with your own configuration
-
-Start with the supplied configuration, validate it, then run it:
+### 3. Validate and run a configuration
 
 ```bash
 cp config/default_config.yaml config/my_app.yaml
@@ -53,11 +42,11 @@ uv run --frozen pcvmf config validate config/my_app.yaml
 uv run --frozen pcvmf run --config config/my_app.yaml
 ```
 
-A valid configuration prints `Valid configuration: 2 workers`. Edit `config/my_app.yaml` to change the image dimensions, pipeline options, or worker rates; the [configuration reference](docs/reference/configuration.md) describes each field. For detection offsets in the demo logs, change `logging.level` to `DEBUG`.
+Validation prints `Valid configuration: 2 workers`. Edit `config/my_app.yaml` to change workers or plugin options, then validate again. Set `logging.level` to `DEBUG` to see target offsets from the demo controller. See the [configuration reference](docs/reference/configuration.md) for accepted fields and defaults.
 
 ### Using pip instead of uv
 
-Choose this setup if you do not use `uv`:
+With Python 3.10–3.12, run these commands from the repository root:
 
 ```bash
 python3 -m venv .venv
@@ -66,187 +55,41 @@ python -m pip install -e ".[dev]"
 pcvmf run
 ```
 
-With the environment activated, use `pcvmf ...` directly wherever this guide shows `uv run ... pcvmf ...`. `python -m pcvmf run` is also supported. Running without `--config` loads packaged defaults and works outside the checkout; relative configuration paths are resolved from your current directory.
+After activation, use `pcvmf ...` wherever the docs show `uv run ... pcvmf ...`. `python -m pcvmf run` also works. Without `--config`, PCVMF loads its packaged demo independently of the checkout.
 
-Configuration errors exit with code 2; runtime or cleanup failures exit with code 1; normal completion and successful signal shutdown exit with code 0.
+## Run the external examples
 
-## How to use the examples
-
-The examples demonstrate plugins maintained outside the framework package. Both use synthetic input, so you can run them without hardware. Run the following commands from the repository root after completing the installation above.
-
-### 1. Install the example plugins once
+The [vision example](examples/vision.yaml) and [sensor example](examples/sensor.yaml) use plugins from a separate package. Install it once after the quick-start setup:
 
 ```bash
 uv pip install --python .venv/bin/python --no-deps --editable ./examples/external_plugins
 ```
 
-For a pip-based setup, with your environment activated, use:
-
-```bash
-python -m pip install --no-deps -e ./examples/external_plugins
-```
-
-The editable install lets you change the example Python files and use those changes on the next run. The examples below use `uv run --no-sync` to preserve this separately installed package. If you run `uv sync` later and an example reports `cannot import robot_plugins...`, repeat the installation command.
-
-### 2. Try the external vision pipeline
+Then validate and run either example from the repository root:
 
 ```bash
 uv run --no-sync pcvmf config validate examples/vision.yaml
 uv run --no-sync pcvmf run --config examples/vision.yaml
 ```
 
-[The vision configuration](examples/vision.yaml) connects synthetic camera frames to [BrightPixelPipeline](examples/external_plugins/robot_plugins/vision.py), which detects bright pixels and returns a bounding box and centroid. The bundled tracking controller consumes those detections. Expect `Application ready: 2 workers`; this example is also headless and quiet at INFO level. Press Ctrl+C when finished.
+Replace `vision.yaml` with `sensor.yaml` to run the synthetic temperature example. Both need no hardware. Expect `Application ready: 2 workers`; the sensor example also logs a received temperature. Press Ctrl+C to stop. Use `--no-sync` so `uv` preserves the separately installed plugin package. If a later `uv sync` removes it, repeat the installation command. With pip, install it using `python -m pip install --no-deps -e ./examples/external_plugins` and run `pcvmf ...` directly.
 
-To see target offsets, copy the configuration and add a top-level logging setting:
+## Documentation
 
-```bash
-cp examples/vision.yaml config/my_vision.yaml
-```
+The [documentation hub](docs/README.md) lists every guide. Start with the task you want to complete:
 
-```yaml
-logging:
-  level: DEBUG
-```
+| Goal | Guide |
+|---|---|
+| Build a first application | [Your first application](docs/tutorials/first-application.md) |
+| Write and install a vision plugin | [Your first vision plugin](docs/tutorials/vision-plugin.md) |
+| Add a sensor and typed message | [Add a sensor and message type](docs/how-to/add-sensor.md) |
+| Connect workers and choose options | [Configuration reference](docs/reference/configuration.md) |
+| Use a camera, video, or display | [Camera and video guide](docs/how-to/camera-and-video.md) |
+| Embed PCVMF in a Python program | [Embedding guide](docs/how-to/embedding.md) |
+| Test components without hardware | [Testing guide](docs/how-to/testing.md) |
+| Build a wheel or container | [Packaging guide](docs/how-to/packaging.md) |
+| Look up Python and wire contracts | [Reference](docs/reference/README.md) |
+| Understand delivery and lifecycle | [Explanation](docs/explanation/README.md) |
+| Diagnose a failure | [Troubleshooting](docs/how-to/troubleshooting.md) |
 
-Then run `uv run --no-sync pcvmf run --config config/my_vision.yaml`. To display the frames in a desktop session, also add the following under the vision worker's `plugin.options`, alongside `pipeline`:
-
-```yaml
-visualizer:
-  class: pcvmf.vision.visualizers:OpenCVVisualizer
-```
-
-### 3. Try a non-vision sensor
-
-```bash
-uv run --no-sync pcvmf config validate examples/sensor.yaml
-uv run --no-sync pcvmf run --config examples/sensor.yaml
-```
-
-[The sensor configuration](examples/sensor.yaml) starts a synthetic temperature publisher and a controller. [The sensor plugin module](examples/external_plugins/robot_plugins/sensor.py) includes the worker, the typed `Temperature` payload, its JSON codec, and the controller. After readiness, expect a message like:
-
-```text
-Received temperature from temperature: 20.00 C
-```
-
-The value may differ; the controller logs the first received reading once and then keeps running. Press Ctrl+C to stop.
-
-### 4. Adapt an example for your project
-
-Use the vision example to replace image processing, or the sensor example to add a new data source and message type. Edit the plugin implementation, point your copied YAML at its `module:Class`, then validate and rerun it. Every published topic must appear in the worker's `publications`, and subscriptions must reference that worker and topic. See [Develop a plugin](#develop-a-plugin) and the [plugin guide](docs/reference/api.md) for the contracts.
-
-## Connect workers
-
-```yaml
-logging: {level: INFO}
-workers:
-  - name: vision
-    plugin:
-      class: pcvmf.workers:VisionWorker
-      options:
-        source:
-          class: pcvmf.vision.sources:SyntheticSource
-          options: {width: 320, height: 240}
-        pipeline:
-          class: pcvmf.vision.pipeline:ColorTracker
-          options: {min_area: 100}
-    rate_hz: 30
-    publications: [vision/telemetry]
-  - name: controller
-    plugin: {class: 'pcvmf.workers:ControllerWorker'}
-    rate_hz: 50
-    subscriptions:
-      - {source: vision, topic: vision/telemetry, delivery: latest}
-```
-
-Each publisher owns its own endpoint. The runtime allocates a unique IPC directory for each application instance. Subscriptions name an upstream worker and an exact topic; adding another publisher does not require modifying the supervisor or sharing a bind address.
-
-Configuration is checked before processes start: unknown keys, invalid plugin types/options, duplicate names/endpoints, and missing publication references are errors. Plugin imports and validators must not acquire resources. Configuration files select Python code, so use trusted configuration and installed plugins.
-
-See the [configuration and lifecycle reference](docs/reference/configuration.md).
-
-## Develop a plugin
-
-Import extension contracts from `pcvmf.api`. Supply a concrete subclass with a resource-free `validate_options()` method. Put the plugin in your own installable package and reference `your_package.module:Class` in YAML.
-
-```python
-from pcvmf.api import ConfigurationError, PipelineResult, VisionPipeline
-
-class MyPipeline(VisionPipeline):
-    @classmethod
-    def validate_options(cls, options):
-        if options:
-            raise ConfigurationError("MyPipeline takes no options")
-
-    def initialize(self):
-        # Load your model here, inside the vision process.
-        pass
-
-    def process(self, frame):
-        # frame.image is a BGR NumPy array; return TargetDetection objects.
-        return PipelineResult([], "NO_TARGETS")
-
-    def cleanup(self):
-        # Must also work if initialize() failed partway through.
-        pass
-```
-
-Supported contracts include `Worker`, `FrameSource`, `VisionPipeline`, `Controller`, `Visualizer`, `Publisher`, `Subscriber`, and `MessageCodec`. Constructors and validators must remain resource-free. Methods must return within the worker's configured timeouts.
-
-The [plugin guide](docs/reference/api.md) explains custom messages and component testing. For installation and runnable walkthroughs, see [How to use the examples](#how-to-use-the-examples).
-
-## Embed and test
-
-The configuration loader, application runner, and component runners are supported application APIs alongside `pcvmf.api`:
-
-```python
-from pcvmf.config import load_config
-from pcvmf.runtime import Application
-
-if __name__ == "__main__":
-    app = Application(load_config("application.yaml"))
-    result = app.run()
-    raise SystemExit(result.exit_code)
-```
-
-Use the `__main__` guard because workers use multiprocessing's `spawn` context. `Application` does not install signal handlers; an embedding application can call `request_stop()`. Each instance runs once. `RunResult` contains `exit_code`, `errors`, and whether the application became `ready`. An optional `on_event(worker_name, event)` callback receives lifecycle notifications in the supervisor; it must return promptly.
-
-`VisionRunner` and `ControllerRunner` in `pcvmf.runners` accept injectable components and monotonic clocks for synchronous testing without multiprocessing or ZeroMQ. Plugin cleanup does not own framework-provided transports: the runtime closes them after plugin cleanup.
-
-```bash
-uv run --frozen pytest
-uv run --frozen ruff check .
-uv run --frozen black --check .
-uv build
-```
-
-The suite exercises actual telemetry exchange, multiple publishers, external plugins, scheduling limits, signals, failures, timeouts, and cleanup. If another environment injects unrelated pytest plugins, use `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`.
-
-## Distribution and containers
-
-`requirements.txt` contains locked runtime dependencies; it does not install PCVMF itself. Build and install the wheel separately:
-
-```bash
-uv build
-uv venv /tmp/pcvmf-wheel
-uv pip install --python /tmp/pcvmf-wheel/bin/python -r requirements.txt dist/*.whl
-/tmp/pcvmf-wheel/bin/python scripts/smoke.py
-```
-
-The smoke script runs the installed demo outside the checkout, waits for readiness, and verifies successful SIGTERM shutdown.
-
-```bash
-docker build -t pcvmf:local .
-docker run --rm pcvmf:local
-docker run --rm pcvmf:local python /opt/pcvmf-smoke.py
-```
-
-The image installs a wheel and runs as a non-root user. For a custom application, install its plugin package in a derived image and mount/pass its configuration. GUI support remains opt-in; the standard container runs headlessly.
-
-Regenerate locked requirements after changing dependencies:
-
-```bash
-uv lock
-uv export --frozen --format requirements-txt --no-hashes --no-dev --no-emit-project -o requirements.txt
-```
-
-GitHub and GitLab CI test Python 3.10, 3.11, and 3.12, clean wheel installations, both external examples, and the Docker image. Publishing is handled separately by the release workflow.
+Configuration files select executable Python classes. Use configurations and plugins you trust. Plugin imports, validation, and constructors must not acquire devices or other runtime resources; initialization inside a worker owns those resources. For messaging and timing limits, see [delivery and timing](docs/explanation/delivery-and-timing.md).

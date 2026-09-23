@@ -6,20 +6,21 @@ Use this guide to verify that an application works without importing from a deve
 
 ## Build and install the framework wheel
 
-From the repository root:
+Run the following commands from the repository root in one shell. A fresh temporary directory keeps old build artifacts out of the wheel selection:
 
 ```bash
-uv build
-uv venv /tmp/pcvmf-release-check
-uv pip install --python /tmp/pcvmf-release-check/bin/python -r requirements.txt dist/pcvmf-0.3.0-py3-none-any.whl
+pcvmf_check_dir="$(mktemp -d)"
+uv build --out-dir "$pcvmf_check_dir/dist"
+uv venv "$pcvmf_check_dir/venv"
+uv pip install --python "$pcvmf_check_dir/venv/bin/python" -r requirements.txt "$pcvmf_check_dir"/dist/*.whl
 ```
 
-Use a fresh temporary environment path if that path is already in use. `requirements.txt` contains locked runtime dependencies, not an editable installation of PCVMF. The wheel provides the framework and packaged demo configuration.
+Keep this shell open for the checks below; they use `pcvmf_check_dir`. `requirements.txt` contains locked runtime dependencies, not an editable installation of PCVMF. The wheel provides the framework and packaged demo configuration.
 
 Verify that it runs from outside the checkout:
 
 ```bash
-/tmp/pcvmf-release-check/bin/python scripts/smoke.py
+"$pcvmf_check_dir/venv/bin/python" scripts/smoke.py
 ```
 
 Expected result: readiness logs, successful SIGTERM shutdown, and `Installed CLI smoke test passed`. The script launches its child from a temporary working directory and removes `PYTHONPATH` from that child's environment.
@@ -27,9 +28,9 @@ Expected result: readiness logs, successful SIGTERM shutdown, and `Installed CLI
 ## Install and verify application plugins
 
 ```bash
-uv pip install --python /tmp/pcvmf-release-check/bin/python --no-deps ./examples/external_plugins
-/tmp/pcvmf-release-check/bin/python scripts/smoke.py --config examples/vision.yaml
-/tmp/pcvmf-release-check/bin/python scripts/smoke.py --config examples/sensor.yaml
+uv pip install --python "$pcvmf_check_dir/venv/bin/python" --no-deps ./examples/external_plugins
+"$pcvmf_check_dir/venv/bin/python" scripts/smoke.py --config examples/vision.yaml
+"$pcvmf_check_dir/venv/bin/python" scripts/smoke.py --config examples/sensor.yaml
 ```
 
 For your application, replace the example package and YAML with your own. A deployed plugin package should declare its PCVMF and model/runtime dependencies. `--no-deps` is appropriate here because the example needs only the already installed framework.

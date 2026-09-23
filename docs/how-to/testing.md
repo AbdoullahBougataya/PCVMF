@@ -2,7 +2,7 @@
 
 [Documentation home](../README.md) · [How-to guides](README.md)
 
-Use direct component tests for algorithm and timing behavior, then process integration tests for wiring and lifecycle. These examples assume `uv sync --frozen --extra dev` has installed the development tools. Save test files in your application package or a dedicated test directory.
+Use direct component tests for algorithm and timing behavior, then process integration tests for wiring and lifecycle. These examples assume `uv sync --frozen --extra dev` has installed the development tools. Run commands from the repository root. Save test files in your application package or a dedicated test directory; use `uv run --no-sync` when tests import a separately installed plugin.
 
 ## Test a vision cycle with a collector
 

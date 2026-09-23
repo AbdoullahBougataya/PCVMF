@@ -4,7 +4,7 @@
 
 **Outcome:** receive two independent publishers in one controller and distinguish their typed payloads.
 
-Complete [your first vision plugin](vision-plugin.md) first: this exercise adds a module to its `my_robot` package. We will also use the repository's synthetic temperature example. No sensor hardware is required.
+Complete [your first vision plugin](vision-plugin.md) first: this exercise adds a module to its installed `my_robot` package. Run every command from the repository root and use `uv run --no-sync` after installing separate plugins. We will also use the repository's synthetic temperature example. No sensor hardware is required.
 
 ## 1. Install the temperature example
 
@@ -14,7 +14,13 @@ From the repository root:
 uv pip install --python .venv/bin/python --no-deps --editable ./examples/external_plugins
 ```
 
-The package provides `TemperatureWorker`, `TemperatureCodec`, and the `Temperature` dataclass in `robot_plugins.sensor`.
+The package provides `TemperatureWorker`, `TemperatureCodec`, and the `Temperature` dataclass in `robot_plugins.sensor`. Check that the package is available in the environment used for the run:
+
+```bash
+uv run --no-sync python -c "from robot_plugins.sensor import Temperature; print(Temperature.__name__)"
+```
+
+Expected output: `Temperature`. If import fails after a later `uv sync`, repeat the installation command above.
 
 ## 2. Write a controller that recognizes both payloads
 
