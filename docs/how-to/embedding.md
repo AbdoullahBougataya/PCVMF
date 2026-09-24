@@ -61,4 +61,6 @@ Use `request_stop()` for parent-requested shutdown. A plugin should instead retu
 
 Inspect `RunResult.exit_code` after `run()` returns. `ready=True` only means initialization succeeded at some point; runtime or cleanup failure can still produce exit code 1. Create a new `Application` for another run; instances are single-use and do not provide automatic restart.
 
+When [MCAP logging](mcap-logging.md) is enabled, `result.recording_path` identifies the file after recorder startup. Parent capture covers the thread running `Application.run()`. Configure the parent logger levels to include the diagnostics you need; the recorder cannot recover records already filtered by the embedding application.
+
 See [lifecycle explanation](../explanation/lifecycle.md) for what happens during shutdown and [API reference](../reference/api.md#application-api) for signatures.

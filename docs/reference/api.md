@@ -71,11 +71,13 @@ Application(config, *, on_event=None)
 
 `run() -> RunResult` blocks while supervising workers and then returns. Each instance is single-use; a second call raises `RuntimeError`. `request_stop()` requests normal shutdown without blocking for completion. It is intended for the parent/embedding application, including its signal handler.
 
-`RunResult` is frozen and contains `exit_code: int`, `errors: tuple[str, ...]`, and `ready: bool`. `ready` indicates that all workers reached readiness; it does not prove telemetry was received. Runtime errors may include several related reports for one failed worker.
+`RunResult` is frozen and contains `exit_code: int`, `errors: tuple[str, ...]`, `ready: bool`, and `recording_path: str | None`. `ready` indicates that all workers reached readiness; it does not prove telemetry was received. `recording_path` is the absolute MCAP file path when the recorder started, or `None` when recording is disabled or recorder startup failed. A path does not guarantee a successful recording; inspect the exit code and errors. Runtime errors may include several related reports for one failed worker.
 
 `on_event(name, event)` runs synchronously in the supervisor. It must return promptly; a callback that raises causes unsuccessful shutdown. Filter the documented [event kinds](cli.md#lifecycle-events) and ignore unknown kinds. The callback is released after the run completes.
 
 `Application` uses a local `spawn` context without changing the global multiprocessing start method. It does not install OS signal handlers or configure the embedding parent's logging. Put application startup under `if __name__ == "__main__":`.
+
+`configure_logging(config.logging)` configures Python console logging using the validated settings. The CLI and child processes call it automatically. Embedding applications can call it explicitly or keep their own logging setup. When MCAP recording is enabled, parent capture covers the thread running `Application.run()`. The recording handler respects `logging.level`, but cannot capture parent log records filtered out by the caller's logger levels. See [MCAP logging](../how-to/mcap-logging.md).
 
 ## Single-step runners
 

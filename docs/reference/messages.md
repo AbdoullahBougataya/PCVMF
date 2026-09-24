@@ -92,4 +92,6 @@ The registry rejects duplicate `(message_type, schema_version)` pairs and duplic
 
 An encoding failure propagates into the publishing worker and causes application failure. A decoding failure discards the incoming message and is logged. This asymmetry keeps invalid locally produced data visible while preventing one malformed incoming message from directly terminating a consumer.
 
+When MCAP recording is enabled, published records retain this JSON envelope and the original topic. See [recorded message fields](../how-to/mcap-logging.md#interpret-published-messages) for channel metadata, timestamps, and sequence handling.
+
 See [add a sensor and message type](../how-to/add-sensor.md) for a complete existing implementation to adapt.

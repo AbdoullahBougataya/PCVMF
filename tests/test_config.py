@@ -69,3 +69,75 @@ def test_packaged_default_outside_checkout(tmp_path, monkeypatch):
     config = load_config()
     assert len(config.workers) == 2
     assert config.workers[1].subscriptions[0].delivery == "latest"
+
+
+def test_mcap_disabled_by_default():
+    assert "mcap" not in parse_config(valid()).logging
+
+
+def test_mcap_defaults_do_not_mutate_input_or_create_files(tmp_path, monkeypatch):
+    config = valid()
+    config["logging"] = {"level": "DEBUG", "mcap": {}}
+    original = deepcopy(config)
+    monkeypatch.chdir(tmp_path)
+
+    parsed = parse_config(config)
+
+    assert parsed.logging == {
+        "level": "DEBUG",
+        "mcap": {"directory": "recordings", "compression": "zstd", "queue_size": 1000},
+    }
+    assert config == original
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("compression", ["none", "lz4", "zstd"])
+def test_mcap_explicit_options(compression, tmp_path):
+    config = valid()
+    directory = tmp_path / "nested" / "recordings"
+    options = {"directory": str(directory), "compression": compression, "queue_size": 1}
+    config["logging"]["mcap"] = options
+
+    parsed = parse_config(config)
+
+    assert parsed.logging["mcap"] == options
+    assert parsed.logging["mcap"] is not options
+    assert not directory.exists()
+
+
+@pytest.mark.parametrize(
+    "options,match",
+    [
+        (None, "logging.mcap: expected a mapping"),
+        (True, "logging.mcap: expected a mapping"),
+        (False, "logging.mcap: expected a mapping"),
+        ("recordings", "logging.mcap: expected a mapping"),
+        ([], "logging.mcap: expected a mapping"),
+        ({"unknown": True}, "logging.mcap: unknown keys"),
+        ({1: "directory"}, "logging.mcap: expected a mapping"),
+        ({"directory": ""}, "logging.mcap.directory"),
+        ({"directory": "  "}, "logging.mcap.directory"),
+        ({"directory": "recordings\0bad"}, "logging.mcap.directory"),
+        ({"directory": None}, "logging.mcap.directory"),
+        ({"directory": False}, "logging.mcap.directory"),
+        ({"directory": 123}, "logging.mcap.directory"),
+        ({"compression": "gzip"}, "logging.mcap.compression"),
+        ({"compression": "ZSTD"}, "logging.mcap.compression"),
+        ({"compression": None}, "logging.mcap.compression"),
+        ({"compression": True}, "logging.mcap.compression"),
+        ({"compression": []}, "logging.mcap.compression"),
+        ({"queue_size": 0}, "logging.mcap.queue_size"),
+        ({"queue_size": -1}, "logging.mcap.queue_size"),
+        ({"queue_size": 1.0}, "logging.mcap.queue_size"),
+        ({"queue_size": True}, "logging.mcap.queue_size"),
+        ({"queue_size": None}, "logging.mcap.queue_size"),
+        ({"queue_size": "1000"}, "logging.mcap.queue_size"),
+        ({"queue_size": float("nan")}, "logging.mcap.queue_size"),
+        ({"queue_size": float("inf")}, "logging.mcap.queue_size"),
+    ],
+)
+def test_invalid_mcap_options(options, match):
+    config = valid()
+    config["logging"]["mcap"] = options
+    with pytest.raises(ConfigurationError, match=match):
+        parse_config(config)

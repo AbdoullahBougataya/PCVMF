@@ -1,0 +1,16 @@
+logging:
+  level: INFO
+  mcap:
+    directory: recordings
+    compression: zstd
+    queue_size: 1000
+workers:
+  - name: vision
+    plugin:
+      class: pcvmf.workers:VisionWorker
+      options:
+        source:
+          class: pcvmf.vision.sources:SyntheticSource
+          options: {width: 320, height: 240, frames: 10}
+    rate_hz: 10
+    publications: [vision/telemetry]

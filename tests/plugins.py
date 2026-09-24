@@ -1,12 +1,14 @@
 """Spawn-importable behavioral fixtures, not part of the distributed framework."""
 
 import json
+import logging
 import os
 import signal
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
-from pcvmf.api import Controller, VisionStatus, Worker
+from pcvmf.api import Controller, MessageCodec, VisionStatus, Worker
 
 
 class ProbeWorker(Worker):
@@ -85,3 +87,51 @@ class PayloadProbeWorker(ProbeWorker):
             return False
         if self.context.monotonic() - self.started > 5:
             raise RuntimeError("external example did not deliver a message")
+
+
+@dataclass(frozen=True)
+class RecordingPayload:
+    phase: str
+
+
+class RecordingPayloadCodec(MessageCodec):
+    message_type = "test.recording"
+    schema_version = 2
+    payload_type = RecordingPayload
+
+    def encode(self, payload):
+        return {"phase": payload.phase}
+
+    def decode(self, payload):
+        if set(payload) != {"phase"} or not isinstance(payload["phase"], str):
+            raise ValueError("expected a recording phase")
+        return RecordingPayload(payload["phase"])
+
+
+class RecordingWorker(Worker):
+    """Publish and log through every lifecycle phase, including failed cleanup."""
+
+    @classmethod
+    def validate_options(cls, options):
+        pass
+
+    def emit(self, phase):
+        logging.getLogger(__name__).info("recording %s", phase)
+        if self.context.publisher:
+            payload = RecordingPayload(phase) if self.options.get("custom") else VisionStatus("OK", phase)
+            self.context.publisher.publish("sample", payload)
+        if self.options.get("fail") == phase:
+            raise RuntimeError(f"intentional recording {phase} failure")
+
+    def initialize(self, context):
+        self.context = context
+        self.index = 0
+        self.emit("initialized")
+
+    def step(self):
+        self.emit(f"step {self.index}")
+        self.index += 1
+        return self.index < self.options.get("steps", 2)
+
+    def cleanup(self):
+        self.emit("cleaned")

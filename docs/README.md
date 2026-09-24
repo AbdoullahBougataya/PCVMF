@@ -17,6 +17,7 @@ You can stop after any tutorial with a working application. If you already have 
 |---|---|
 | Use a webcam, recorded video, or debug window | [Camera and video](how-to/camera-and-video.md) |
 | Add a non-vision data source | [Add a sensor and message type](how-to/add-sensor.md) |
+| Record messages and diagnostic logs in one file | [MCAP logging](how-to/mcap-logging.md) |
 | Test an algorithm or application | [Test components without hardware](how-to/testing.md) |
 | Embed PCVMF in another Python program | [Embed and stop an application](how-to/embedding.md) |
 | Build a wheel or container | [Package an application](how-to/packaging.md) |

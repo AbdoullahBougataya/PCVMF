@@ -3,6 +3,7 @@
 import logging
 import multiprocessing as mp
 import tempfile
+import threading
 import time
 import traceback
 from dataclasses import asdict, dataclass
@@ -12,6 +13,7 @@ from typing import Callable
 from .api import Worker, WorkerContext
 from .messages import CodecRegistry
 from .plugins import instantiate
+from .recording import McapLogHandler, McapRecorder, RecordingClient
 from .runners import cleanup_all
 from .transport import ZMQPublisher, ZMQSubscriber
 
@@ -29,16 +31,26 @@ def configure_logging(config):
     )
 
 
-def _worker_main(spec, config, endpoints, stop, start, channel):
+def _worker_main(spec, config, endpoints, stop, start, channel, recording_endpoint=None):
     configure_logging(config.logging)
     worker = None
     publisher = None
     subscriber = None
+    recorder = None
+    log_handler = None
     failed = False
     try:
+        if recording_endpoint is not None:
+            recorder = RecordingClient(
+                recording_endpoint, spec.name, config.logging["mcap"]["queue_size"], spec.startup_timeout
+            )
+            log_handler = McapLogHandler(recorder, spec.name, config.logging.get("level", "INFO"))
+            logging.getLogger().addHandler(log_handler)
         registry = CodecRegistry(config.codecs)
         if spec.publications:
-            publisher = ZMQPublisher(endpoints[spec.name], spec.name, spec.publications, registry, config.hwm)
+            publisher = ZMQPublisher(
+                endpoints[spec.name], spec.name, spec.publications, registry, config.hwm, recorder=recorder
+            )
             channel.send({"kind": "resources", "owned": publisher.owned_paths()})
         if spec.subscriptions:
             subscriber = ZMQSubscriber(spec.subscriptions, endpoints, registry, config.hwm)
@@ -52,6 +64,8 @@ def _worker_main(spec, config, endpoints, stop, start, channel):
         last_heartbeat = deadline
         last_warning = float("-inf")
         while not stop.is_set():
+            if recorder is not None:
+                recorder.check()
             if worker.step() is False:
                 channel.send({"kind": "complete"})
                 break
@@ -94,7 +108,19 @@ def _worker_main(spec, config, endpoints, stop, start, channel):
             cleanup_all(callbacks)
         except BaseException as exc:
             failed = True
+            logger.exception("Worker %s cleanup failed", spec.name)
             channel.send({"kind": "failure", "error": str(exc)})
+        if log_handler is not None:
+            logging.getLogger().removeHandler(log_handler)
+            log_handler.close()
+        if recorder is not None:
+            try:
+                recorder.flush(spec.shutdown_timeout)
+            except BaseException as exc:
+                failed = True
+                channel.send({"kind": "failure", "error": str(exc)})
+            finally:
+                recorder.close()
         channel.send({"kind": "exited", "ok": not failed})
         channel.close()
     if failed:
@@ -106,6 +132,7 @@ class RunResult:
     exit_code: int
     errors: tuple[str, ...]
     ready: bool
+    recording_path: str | None = None
 
 
 class Application:
@@ -130,7 +157,10 @@ class Application:
         errors = []
         states = {}
         ready = False
-        logger.debug("Effective configuration: %s", asdict(self.config))
+        recorder = None
+        log_handler = None
+        recording_path = None
+        recording_failed = False
 
         def error(name, message):
             detail = f"{name}: {message}"
@@ -165,11 +195,33 @@ class Application:
                         error(name, "unsuccessful cleanup or execution")
                 state["last_progress"] = time.monotonic()
 
+        def poll_recording():
+            nonlocal recording_failed
+            if recorder is not None:
+                try:
+                    recorder.poll()
+                except Exception as exc:
+                    recorder._failed(exc)
+                if recorder.error and not recording_failed:
+                    recording_failed = True
+                    error("recorder", recorder.error)
+
         with tempfile.TemporaryDirectory(prefix="pcvmf-", dir="/tmp") as directory:
             endpoints = {
                 w.name: w.endpoint or f"ipc://{directory}/{w.name}.ipc" for w in self.config.workers if w.publications
             }
             try:
+                recording_endpoint = None
+                if "mcap" in self.config.logging:
+                    recording_endpoint = f"ipc://{directory}/.recording.ipc"
+                    recorder = McapRecorder(self.config.logging["mcap"], recording_endpoint)
+                    recording_path = recorder.path
+                    log_handler = McapLogHandler(recorder, "application", self.config.logging.get("level", "INFO"))
+                    owner_thread = threading.get_ident()
+                    log_handler.addFilter(lambda record: record.thread == owner_thread)
+                    logging.getLogger().addHandler(log_handler)
+                    logger.info("MCAP recording: %s", recording_path)
+                logger.debug("Effective configuration: %s", asdict(self.config))
                 for spec in self.config.workers:
                     parent, child = self.context.Pipe(duplex=False)
                     process = self.context.Process(
@@ -182,6 +234,7 @@ class Application:
                             self.stop,
                             self.start,
                             child,
+                            recording_endpoint,
                         ),
                     )
                     state = {
@@ -204,6 +257,7 @@ class Application:
                         child.close()
                     states[spec.name] = state
                 while not self.stop.is_set() and not self._stop_requested:
+                    poll_recording()
                     for name, state in states.items():
                         receive(name, state)
                         if not state["process"].is_alive() and not self.stop.is_set():
@@ -237,6 +291,7 @@ class Application:
                 shutdown_started = time.monotonic()
                 pending = set(states)
                 while pending:
+                    poll_recording()
                     for name in list(pending):
                         state = states[name]
                         # Continue draining lifecycle events while children release resources.
@@ -284,9 +339,17 @@ class Application:
                                 pass
                             except OSError as exc:
                                 error(name, f"endpoint cleanup failed: {exc}")
+                poll_recording()
+                if log_handler is not None:
+                    logging.getLogger().removeHandler(log_handler)
+                    log_handler.close()
+                if recorder is not None:
+                    recorder.close()
+                    if recorder.error and not recording_failed:
+                        error("recorder", recorder.error)
                 # Temporary directory cleanup covers auto-allocated endpoints even after kill.
         # Completion callbacks commonly capture the Application to request a
         # stop. Break that cycle so multiprocessing semaphores are finalized
         # promptly instead of during a later resource-tracker operation.
         self.on_event = None
-        return RunResult(1 if errors else 0, tuple(errors), ready)
+        return RunResult(1 if errors else 0, tuple(errors), ready, recording_path)

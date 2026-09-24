@@ -6,7 +6,7 @@ PCVMF treats a configured application as one supervised unit. Every worker is re
 
 ## Initialization and readiness
 
-The parent validates configuration before launching children. Each child creates its own transports, constructs its worker, and initializes resources. It reports readiness over a control pipe and waits at a shared execution gate. The parent opens that gate only when all workers are ready.
+The parent validates configuration before launching children. If MCAP recording is enabled, it starts the recorder before launching workers; recorder startup failure prevents worker startup. Each child connects to the recorder when enabled, creates its own publication and subscription transports, constructs its worker, and initializes resources. It reports readiness over a control pipe and waits at a shared execution gate. The parent opens that gate only when all workers are ready.
 
 ```mermaid
 stateDiagram-v2
@@ -44,6 +44,12 @@ A computation may finish successfully while hardware release or another cleanup 
 Plugins must handle partial initialization. If the camera opens and model loading fails, camera release is still necessary. Cleanup should also attempt later releases even if an earlier one fails. Framework runners apply this policy to their components, and the runtime applies it to worker and transport cleanup.
 
 The parent waits for graceful exit up to each worker's allowance, then uses terminate and finally kill with bounded waits. Forced termination cannot execute arbitrary cleanup reliably. The parent can clean owned IPC paths using recorded file identities, but it cannot undo every device-side effect. This is why bounded, cooperative cleanup remains important.
+
+## Recording finalization is part of shutdown
+
+With MCAP enabled, workers finish plugin cleanup before flushing queued recording data. The parent continues draining records during shutdown and finalizes the shared file after workers exit. Recording flushes must fit within the worker shutdown allowance along with its other cleanup.
+
+A queue overflow, write error, or flush failure makes the application result unsuccessful. `RunResult.recording_path` can still identify a file from a failed run, so check `exit_code` and `errors` before treating the recording as complete. Forced termination may lose buffered records, and abrupt parent termination may prevent file finalization. See [recording failures and shutdown](../how-to/mcap-logging.md#handle-recording-failures-and-shutdown).
 
 ## Why there is no automatic restart
 

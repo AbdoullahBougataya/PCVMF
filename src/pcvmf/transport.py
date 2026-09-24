@@ -13,12 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 class ZMQPublisher(Publisher):
-    def __init__(self, endpoint, source, topics, registry, hwm=100, wall_clock=time.time):
+    def __init__(self, endpoint, source, topics, registry, hwm=100, wall_clock=time.time, *, recorder=None):
         self.endpoint = endpoint
         self.source = source
         self.topics = set(topics)
         self.registry = registry
         self.wall_clock = wall_clock
+        self.recorder = recorder
         self.sequence = 0
         self.context = None
         self.socket = None
@@ -58,6 +59,8 @@ class ZMQPublisher(Publisher):
         wire = self.registry.encode(self.source, self.sequence, self.wall_clock(), payload)
         self.sequence += 1
         self.socket.send_multipart([topic.encode(), wire], flags=zmq.NOBLOCK)
+        if self.recorder is not None:
+            self.recorder.record_message(topic, wire)
 
     def close(self):
         try:

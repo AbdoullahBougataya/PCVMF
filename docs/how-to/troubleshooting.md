@@ -67,6 +67,16 @@ Prefer automatic endpoints by omitting `endpoint`. For an explicit IPC path, ens
 
 An `Operation not permitted` while binding an otherwise valid local socket can come from a sandbox policy. Run integration checks in an environment that permits IPC sockets. Changing detector code will not resolve a denied bind operation.
 
+## Recording is missing, incomplete, or fails
+
+Check that `logging.mcap` is a mapping. `{}` enables defaults; omitting the field disables recording. Validation does not create a file. Run the application and look for the INFO message `MCAP recording: PATH`, or inspect `RunResult.recording_path` when embedding PCVMF. A higher logging level can hide the path message.
+
+Relative output directories resolve from the launch working directory. Check directory permissions and free disk space there. In a container, use a writable mounted output directory if recordings must survive container removal. Recorder startup failure stops the application before workers start.
+
+For a queue-full error, reduce sustained publication or diagnostic volume and check storage throughput. Increase `queue_size` only to accommodate short bursts. A flush timeout also consumes the worker's `shutdown_timeout`; allow time for both plugin cleanup and recording flushes. Inspect the exit code and all reported errors even when a file exists.
+
+If published messages are present but diagnostics are missing, check `logging.level` and Python logger levels and propagation. Parent capture covers only the thread running `Application.run()`. Plain `print()` output is not a Python log record. Raw camera frames are not included in built-in telemetry recordings. Use the [MCAP inspection example](mcap-logging.md#inspect-the-newest-recording) to examine topics and records.
+
 ## Nonzero exit during shutdown
 
 Read all worker failure and cleanup messages. Cleanup failure, missing acknowledgement, abnormal worker exit, and forced termination make shutdown unsuccessful even after Ctrl+C. Ensure cleanup handles partial initialization and returns within `shutdown_timeout`; release every acquired resource even when another release operation fails.

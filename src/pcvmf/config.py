@@ -149,8 +149,8 @@ def parse_config(raw: dict) -> AppConfig:
     from .messages import CodecRegistry
 
     CodecRegistry(codecs)
-    logging_cfg = mapping(raw.get("logging", {}), "logging")
-    keys(logging_cfg, {"level", "format"}, "logging")
+    logging_cfg = dict(mapping(raw.get("logging", {}), "logging"))
+    keys(logging_cfg, {"level", "format", "mcap"}, "logging")
     if logging_cfg.get("level", "INFO") not in (
         "DEBUG",
         "INFO",
@@ -166,6 +166,20 @@ def parse_config(raw: dict) -> AppConfig:
             logging.Formatter(string(logging_cfg["format"], "logging.format"))
         except ValueError as exc:
             raise ConfigurationError(f"logging.format: {exc}") from exc
+    if "mcap" in logging_cfg:
+        mcap_cfg = mapping(logging_cfg["mcap"], "logging.mcap")
+        keys(mcap_cfg, {"directory", "compression", "queue_size"}, "logging.mcap")
+        directory = string(mcap_cfg.get("directory", "recordings"), "logging.mcap.directory")
+        if "\0" in directory:
+            raise ConfigurationError("logging.mcap.directory: must not contain NUL characters")
+        compression = mcap_cfg.get("compression", "zstd")
+        if compression not in ("none", "lz4", "zstd"):
+            raise ConfigurationError("logging.mcap.compression: expected none, lz4, or zstd")
+        logging_cfg["mcap"] = {
+            "directory": directory,
+            "compression": compression,
+            "queue_size": number(mcap_cfg.get("queue_size", 1000), "logging.mcap.queue_size", integer=True),
+        }
     return AppConfig(
         tuple(workers),
         tuple(codecs),

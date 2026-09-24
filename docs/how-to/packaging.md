@@ -49,6 +49,8 @@ The Dockerfile installs a wheel into a virtual environment, includes required Op
 
 For custom plugins, create a derived image that installs their package and copies or mounts a configuration file, then launch `pcvmf run --config /path/in/container.yaml`. Ensure any device or file paths refer to resources actually accessible inside the container. GUI display and hardware access require additional environment-specific setup; they are not exercised by the headless smoke test.
 
+For [MCAP recording](mcap-logging.md), mount an output directory writable by the container user and set `logging.mcap.directory` to its path inside the container. Store recordings on that mount to retain them when a container started with `--rm` exits.
+
 ## Keep dependency artifacts consistent
 
 After changing framework dependencies:

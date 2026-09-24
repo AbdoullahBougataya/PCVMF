@@ -85,6 +85,17 @@ uv run --no-sync pcvmf run --config examples/vision.yaml
 
 Replace `vision.yaml` with `sensor.yaml` to run the synthetic temperature example. Both need no hardware. Expect `Application ready: 2 workers`; the sensor example also logs a received temperature. Press Ctrl+C to stop. Use `--no-sync` so `uv` preserves the separately installed plugin package. If a later `uv sync` removes it, repeat the installation command. With pip, install it using `python -m pip install --no-deps -e ./examples/external_plugins` and run `pcvmf ...` directly.
 
+## Record a run in MCAP
+
+MCAP recording saves published messages and Python diagnostic logs in one file per run. After installation, try the finite synthetic example:
+
+```bash
+uv run --no-sync pcvmf config validate examples/recording.yaml
+uv run --no-sync pcvmf run --config examples/recording.yaml
+```
+
+The example exits automatically after ten frames and writes a new `.mcap` file under `recordings/`. To enable recording in your own configuration, add `mcap: {}` under `logging`. Recording is disabled when this field is omitted. See the [MCAP logging guide](docs/how-to/mcap-logging.md) to inspect files, choose compression, and handle failures.
+
 ## Documentation
 
 The [documentation hub](docs/README.md) lists every guide. Start with the task you want to complete:
@@ -96,6 +107,7 @@ The [documentation hub](docs/README.md) lists every guide. Start with the task y
 | Add a sensor and typed message | [Add a sensor and message type](docs/how-to/add-sensor.md) |
 | Connect workers and choose options | [Configuration reference](docs/reference/configuration.md) |
 | Use a camera, video, or display | [Camera and video guide](docs/how-to/camera-and-video.md) |
+| Record messages and diagnostic logs | [MCAP logging guide](docs/how-to/mcap-logging.md) |
 | Embed PCVMF in a Python program | [Embedding guide](docs/how-to/embedding.md) |
 | Test components without hardware | [Testing guide](docs/how-to/testing.md) |
 | Build a wheel or container | [Packaging guide](docs/how-to/packaging.md) |

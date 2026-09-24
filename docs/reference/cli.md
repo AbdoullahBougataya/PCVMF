@@ -40,6 +40,7 @@ SIGINT and SIGTERM received by the CLI request normal shutdown. Cleanup still mu
 | `Worker NAME ready` / INFO | That worker completed initialization |
 | `Application ready: N workers` / INFO | Every worker initialized and the execution gate opened |
 | `Effective configuration` / DEBUG | Validated settings used for the run |
+| `MCAP recording: PATH` / INFO | Absolute path of the new per-run recording, when enabled |
 | `Target offset` / DEBUG | Sample tracking controller's computed pixel offset |
 | `Stale input` / WARNING | No accepted message on a route within its configured interval |
 | `Input recovered` / INFO | A previously stale route received a message |

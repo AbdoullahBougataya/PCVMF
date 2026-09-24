@@ -7,6 +7,7 @@ These guides assume an installed PCVMF environment and a concrete task. For a gu
 - [Use a camera, video file, or debug window](camera-and-video.md).
 - [Add a sensor and message type](add-sensor.md).
 - [Test components without hardware](testing.md).
+- [Record messages and diagnostic logs in MCAP](mcap-logging.md).
 - [Embed and stop an application](embedding.md).
 - [Build and run a distributable application](packaging.md).
 - [Diagnose configuration and runtime failures](troubleshooting.md).

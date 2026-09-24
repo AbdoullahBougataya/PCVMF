@@ -53,6 +53,12 @@ A publication is a logical topic, not a socket to bind. Each publisher worker ow
 
 This avoids multiple workers trying to own the same IPC path. It also makes concurrent application instances practical: default paths belong to unique per-run directories. A central broker is not required for the current topology, but there is no distributed discovery, durable routing, or remote endpoint configuration in this version.
 
+## The parent owns optional recording
+
+When `logging.mcap` is present, the parent creates one MCAP writer before starting workers. Workers send copies of published envelopes and structured Python logs over a separate recording connection. The parent also buffers logs from the thread running `Application.run()` and drains records while supervising the application.
+
+The writer and file handle stay in the parent process. Recording does not require a subscriber worker or a change to plugin APIs. Plugins continue to publish typed payloads through the injected publisher and use Python logging for diagnostics. See [MCAP logging](../how-to/mcap-logging.md) for configuration and record formats.
+
 ## Public boundaries and evolution
 
 The public contracts describe what application plugins need to implement; built-in component paths provide useful defaults. Configuration loading, application execution, and single-step runners are documented application APIs. Internal transport and registry classes are implementation details.

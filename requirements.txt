@@ -2,6 +2,10 @@
 #    uv export --frozen --format requirements-txt --no-hashes --no-dev --no-emit-project -o requirements.txt
 cffi==2.1.1 ; implementation_name == 'pypy'
     # via pyzmq
+lz4==4.4.5
+    # via mcap
+mcap==1.4.0
+    # via pcvmf
 numpy==2.2.6 ; python_full_version < '3.11'
     # via
     #   opencv-python
@@ -22,3 +26,5 @@ pyyaml==6.0.3
     # via pcvmf
 pyzmq==27.2.0
     # via pcvmf
+zstandard==0.25.0
+    # via mcap

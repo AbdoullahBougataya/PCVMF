@@ -24,11 +24,19 @@ Queue high-water marks bound transport queues, but do not make `latest` a global
 
 ## PUB/SUB has no delivery guarantee
 
-The transport has no replay, acknowledgements, or durable storage. Initial publications can be missed while subscriptions connect, and queue pressure can drop messages. `ordered` means the order of messages received and dispatched, not proof that every sent message arrived. Sequence numbers can help an application observe gaps, but the framework does not repair them.
+The live PUB/SUB transport has no replay, acknowledgements, or durable storage. Initial publications can be missed while subscriptions connect, and queue pressure can drop messages. `ordered` means the order of messages received and dispatched, not proof that every sent message arrived. Sequence numbers can help an application observe gaps, but the framework does not repair them.
 
 Readiness uses a separate lifecycle channel and means workers have initialized. It does not establish a delivery barrier for the data plane. This is why tests should wait for a known payload rather than infer message exchange from readiness or elapsed time alone.
 
 A control command that requires confirmation needs a different communication contract. PCVMF's current telemetry transport does not implement that contract.
+
+## Recording and live delivery are independent
+
+Optional MCAP recording captures each published JSON envelope through a separate worker-to-parent transport. It works even when no subscriber is configured. Controller delivery modes such as `latest` and `ordered` do not select which publications are recorded, and `logging.level` filters only diagnostic logs.
+
+A recorded publication proves that the recorder captured it; it does not prove a controller received or processed it. The recording path acknowledges queued records during shutdown, but adds no acknowledgement or replay to the live PUB/SUB path. PCVMF provides no replay command.
+
+Recording also adds serialization, queueing, and disk work. The parent writes the file while supervising workers, so slow storage can delay supervision. A full recording queue or write failure makes the run fail. See the [MCAP guide](../how-to/mcap-logging.md#handle-recording-failures-and-shutdown) for shutdown and durability limits.
 
 ## Bounded receiving protects opportunities to tick
 

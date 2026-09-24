@@ -81,6 +81,7 @@ Normalized endpoints must be unique. IPC publishers create an ownership lock and
 |---|---|---|
 | `level` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
 | `format` | See below | Python logging percent-style format string |
+| `mcap` | Omitted (disabled) | Mapping; `{}` enables recording with defaults |
 
 Default format:
 
@@ -89,6 +90,20 @@ Default format:
 ```
 
 DEBUG logging includes the effective configuration. Configuration validation checks format syntax; it does not prove that arbitrary custom LogRecord field names exist at runtime.
+
+### MCAP recording fields
+
+`logging.mcap` records published messages and diagnostic logs in one new file per application run. Omit this field to disable recording. An empty mapping enables the defaults; `false` and `null` are invalid.
+
+| Field | Type | Default | Constraint or meaning |
+|---|---|---|---|
+| `directory` | String | `recordings` | Nonempty, without NUL characters; relative to the launch working directory; created at run time |
+| `compression` | String | `zstd` | `zstd`, `lz4`, or `none` |
+| `queue_size` | Integer | `1000` | Positive per-worker ZeroMQ high-water mark and parent log buffer limit; approximate queued record count, not a byte limit |
+
+Unknown recording fields are rejected. Validation does not create the output directory or file. `logging.level` filters diagnostics independently of messages, which are captured regardless of subscribers. `logging.format` does not change structured records.
+
+See [record messages and diagnostic logs in MCAP](../how-to/mcap-logging.md) for a finite example, record formats, reading files, and failure behavior.
 
 ## Validation boundaries
 
