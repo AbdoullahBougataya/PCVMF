@@ -2,7 +2,7 @@
 
 [Documentation home](../README.md) · [Reference](README.md)
 
-Implementations: [cli.py](../../src/pcvmf/cli.py), [runtime.py](../../src/pcvmf/runtime.py).
+Implementations: [cli.py](../../src/pcvmf/cli.py), [runtime.py](../../src/pcvmf/runtime.py), [yamcs/xtce.py](../../src/pcvmf/yamcs/xtce.py).
 
 ## Commands
 
@@ -12,6 +12,7 @@ Implementations: [cli.py](../../src/pcvmf/cli.py), [runtime.py](../../src/pcvmf/
 | `pcvmf run` | Run the packaged headless demo |
 | `pcvmf run --config PATH` | Load, validate, and run an application |
 | `pcvmf config validate PATH` | Validate configuration and plugin imports/options, then exit |
+| `pcvmf yamcs mdb --config PATH [--worker NAME] [-o FILE]` | Write the XTCE mission database for a `YamcsExporter` worker to `FILE` or standard output. `--worker` is required when several exporters exist |
 | `pcvmf --help` | Show command help |
 | `python -m pcvmf ...` | Equivalent module entry point |
 
@@ -41,6 +42,7 @@ SIGINT and SIGTERM received by the CLI request normal shutdown. Cleanup still mu
 | `Application ready: N workers` / INFO | Every worker initialized and the execution gate opened |
 | `Effective configuration` / DEBUG | Validated settings used for the run |
 | `MCAP recording: PATH` / INFO | Absolute path of the new per-run recording, when enabled |
+| `Skipped Yamcs packet NAME` / WARNING | A `YamcsExporter` message could not be mapped; logged once per packet |
 | `Target offset` / DEBUG | Sample tracking controller's computed pixel offset |
 | `Stale input` / WARNING | No accepted message on a route within its configured interval |
 | `Input recovered` / INFO | A previously stale route received a message |

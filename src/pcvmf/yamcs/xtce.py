@@ -1,0 +1,109 @@
+"""Generate an XTCE mission database that matches the packets produced by packets.encode."""
+
+import xml.etree.ElementTree as ET
+
+from .mapping import ExportSpec, PacketSpec
+from .packets import layout
+
+NAMESPACE = "http://www.omg.org/spec/XTCE/20180204"
+HEADER = (
+    ("CCSDS_VERSION", 3),
+    ("CCSDS_TYPE", 1),
+    ("CCSDS_SEC_HDR_FLAG", 1),
+    ("CCSDS_APID", 11),
+    ("CCSDS_GROUP_FLAGS", 2),
+    ("CCSDS_SEQ_COUNT", 14),
+    ("CCSDS_PACKET_LENGTH", 16),
+)
+TIME_PARAMETER = "PACKET_TIME"
+SEQUENCE_PARAMETER = "PACKET_SEQUENCE"
+ROOT_CONTAINER = "CCSDSPacket"
+PACKET_CONTAINER = "Packet"
+
+
+def _sub(parent: ET.Element, tag: str, **attrs) -> ET.Element:
+    return ET.SubElement(parent, tag, {k.rstrip("_"): str(v) for k, v in attrs.items()})
+
+
+def _integer_encoding(parent: ET.Element, size: int, signed: bool = False) -> None:
+    _sub(parent, "IntegerDataEncoding", sizeInBits=size, encoding="twosComplement" if signed else "unsigned")
+
+
+def _units(parent: ET.Element, units: str | None) -> None:
+    unit_set = _sub(parent, "UnitSet")
+    if units:
+        _sub(unit_set, "Unit").text = units
+
+
+def _root(space_system: ET.Element) -> None:
+    tm = _sub(space_system, "TelemetryMetaData")
+    types = _sub(tm, "ParameterTypeSet")
+    params = _sub(tm, "ParameterSet")
+    for name, size in HEADER:
+        ptype = _sub(types, "IntegerParameterType", name=f"{name}_t", signed="false", sizeInBits=size)
+        _units(ptype, None)
+        _integer_encoding(ptype, size)
+        _sub(params, "Parameter", name=name, parameterTypeRef=f"{name}_t")
+    time_type = _sub(types, "AbsoluteTimeParameterType", name=f"{TIME_PARAMETER}_t")
+    encoding = _sub(time_type, "Encoding", scale="0.001", offset="0")
+    _integer_encoding(encoding, 64)
+    _sub(_sub(time_type, "ReferenceTime"), "Epoch").text = "UNIX"
+    _sub(params, "Parameter", name=TIME_PARAMETER, parameterTypeRef=f"{TIME_PARAMETER}_t")
+    sequence_type = _sub(types, "IntegerParameterType", name=f"{SEQUENCE_PARAMETER}_t", signed="false", sizeInBits=32)
+    _units(sequence_type, None)
+    _integer_encoding(sequence_type, 32)
+    _sub(params, "Parameter", name=SEQUENCE_PARAMETER, parameterTypeRef=f"{SEQUENCE_PARAMETER}_t")
+    container = _sub(_sub(tm, "ContainerSet"), "SequenceContainer", name=ROOT_CONTAINER, abstract="true")
+    entries = _sub(container, "EntryList")
+    for name in (*(name for name, _ in HEADER), TIME_PARAMETER, SEQUENCE_PARAMETER):
+        _sub(entries, "ParameterRefEntry", parameterRef=name)
+
+
+def _packet(parent: ET.Element, root_name: str, packet: PacketSpec) -> None:
+    space_system = _sub(parent, "SpaceSystem", name=packet.name)
+    _sub(space_system, "LongDescription").text = f"PCVMF topic {packet.topic} published by {packet.source}"
+    tm = _sub(space_system, "TelemetryMetaData")
+    types = _sub(tm, "ParameterTypeSet")
+    params = _sub(tm, "ParameterSet")
+    for param, field in zip(packet.parameters, layout(packet)):
+        type_name = f"{param.name}_t"
+        size = field.size_bits
+        if param.type in ("float32", "float64"):
+            ptype = _sub(types, "FloatParameterType", name=type_name, sizeInBits=size)
+            _units(ptype, param.units)
+            _sub(ptype, "FloatDataEncoding", sizeInBits=size, encoding="IEEE754_1985")
+        elif param.type in ("int32", "uint32"):
+            signed = param.type == "int32"
+            ptype = _sub(types, "IntegerParameterType", name=type_name, signed=str(signed).lower(), sizeInBits=size)
+            _units(ptype, param.units)
+            _integer_encoding(ptype, size, signed)
+        elif param.type == "bool":
+            ptype = _sub(types, "BooleanParameterType", name=type_name)
+            _units(ptype, param.units)
+            _integer_encoding(ptype, size)
+        else:
+            ptype = _sub(types, "EnumeratedParameterType", name=type_name)
+            _units(ptype, param.units)
+            _integer_encoding(ptype, size)
+            enumerations = _sub(ptype, "EnumerationList")
+            for label, value in sorted(param.values, key=lambda item: item[1]):
+                _sub(enumerations, "Enumeration", value=value, label=label)
+        _sub(params, "Parameter", name=param.name, parameterTypeRef=type_name, shortDescription=param.field)
+    container = _sub(_sub(tm, "ContainerSet"), "SequenceContainer", name=PACKET_CONTAINER)
+    entries = _sub(container, "EntryList")
+    for param in packet.parameters:
+        _sub(entries, "ParameterRefEntry", parameterRef=param.name)
+    base = _sub(container, "BaseContainer", containerRef=f"/{root_name}/{ROOT_CONTAINER}")
+    criteria = _sub(base, "RestrictionCriteria")
+    _sub(criteria, "Comparison", parameterRef=f"/{root_name}/CCSDS_APID", value=packet.apid)
+
+
+def generate_xtce(spec: ExportSpec) -> str:
+    """Return an XTCE 1.2 document with one child space system per packet."""
+    root = ET.Element("SpaceSystem", {"name": spec.space_system, "xmlns": NAMESPACE})
+    _sub(root, "LongDescription").text = "Generated by pcvmf yamcs mdb; do not edit by hand."
+    _root(root)
+    for packet in spec.packets:
+        _packet(root, spec.space_system, packet)
+    ET.indent(root)
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(root, encoding="unicode") + "\n"

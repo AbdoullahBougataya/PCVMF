@@ -1,0 +1,16 @@
+services:
+  - class: org.yamcs.http.HttpServer
+    args:
+      port: 8090
+      # Allow a separately served Open MCT page to call the API during development.
+      cors:
+        allowOrigin: "*"
+        allowCredentials: false
+
+instances:
+  - pcvmf
+
+dataDir: /storage/yamcs-data
+
+# Development only. Replace before exposing Yamcs beyond localhost.
+secretKey: "pcvmf-development-only"

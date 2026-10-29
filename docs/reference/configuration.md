@@ -111,4 +111,4 @@ Validation rejects malformed YAML, unknown framework keys, missing or duplicate 
 
 The parser cannot infer a plugin's publication needs from arbitrary code. For example, a vision worker needs its configured output topic declared in `publications`; an omitted publisher fails initialization and a mismatched publication fails when publishing.
 
-See [built-in component options](components.md) for the contents of `plugin.options` and [troubleshooting](../how-to/troubleshooting.md) for common errors.
+See [built-in component options](components.md) for the contents of `plugin.options`, including the [Yamcs exporter](components.md#yamcsexporter), and [troubleshooting](../how-to/troubleshooting.md) for common errors.

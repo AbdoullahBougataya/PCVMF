@@ -59,6 +59,12 @@ When `logging.mcap` is present, the parent creates one MCAP writer before starti
 
 The writer and file handle stay in the parent process. Recording does not require a subscriber worker or a change to plugin APIs. Plugins continue to publish typed payloads through the injected publisher and use Python logging for diagnostics. See [MCAP logging](../how-to/mcap-logging.md) for configuration and record formats.
 
+## External telemetry is a subscriber worker
+
+`YamcsExporter` forwards telemetry to Yamcs as an ordinary worker. It subscribes to the routes it exports and sends UDP packets from its own process. Using a worker keeps the exporter within the public plugin contracts: it needs no runtime hook, it works with or without MCAP recording, and a slow or unreachable Yamcs server cannot block the parent.
+
+Codecs validate payloads in code and do not publish field-level schemas. The exporter therefore uses an explicit field mapping in YAML. The same mapping produces the packet bytes and the XTCE mission database, so the two stay consistent as long as the MDB is regenerated after each mapping change. Open MCT reads parameter definitions from Yamcs through the `openmct-yamcs` plugin, so it uses the same mapping without PCVMF changes. See [Stream telemetry to Yamcs](../how-to/stream-to-yamcs.md).
+
 ## Public boundaries and evolution
 
 The public contracts describe what application plugins need to implement; built-in component paths provide useful defaults. Configuration loading, application execution, and single-step runners are documented application APIs. Internal transport and registry classes are implementation details.

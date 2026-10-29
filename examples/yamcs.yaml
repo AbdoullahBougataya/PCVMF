@@ -1,0 +1,38 @@
+# Stream synthetic vision telemetry to the Yamcs instance in deploy/yamcs.
+# Regenerate the mission database after editing packets:
+#   uv run --frozen pcvmf yamcs mdb --config examples/yamcs.yaml -o deploy/yamcs/mdb/pcvmf.xml
+workers:
+  - name: vision
+    plugin:
+      class: pcvmf.workers:VisionWorker
+      options:
+        source:
+          class: pcvmf.vision.sources:SyntheticSource
+          options: {width: 320, height: 240}
+    rate_hz: 10
+    publications: [vision/telemetry]
+  - name: yamcs
+    plugin:
+      class: pcvmf.yamcs:YamcsExporter
+      options:
+        host: 127.0.0.1
+        port: 10015
+        packets:
+          - name: vision_telemetry
+            apid: 100
+            source: vision
+            topic: vision/telemetry
+            parameters:
+              - {name: frame_id, type: uint32}
+              - {name: width, type: uint32, units: px}
+              - {name: height, type: uint32, units: px}
+              - {name: capture_time_ms, type: float64, units: ms}
+              - {name: processing_time_ms, type: float64, units: ms}
+              - {name: detection_count, field: detections, reduce: count, type: uint32}
+              - {name: target_confidence, field: detections.0.confidence, type: float64, default: 0.0}
+              - {name: target_x, field: detections.0.centroid.0, type: int32, units: px, default: -1}
+              - {name: target_y, field: detections.0.centroid.1, type: int32, units: px, default: -1}
+              - {name: status, type: enum, values: {OK: 0, NO_TARGETS: 1}}
+    rate_hz: 20
+    subscriptions:
+      - {source: vision, topic: vision/telemetry, delivery: ordered}

@@ -108,6 +108,7 @@ The [documentation hub](docs/README.md) lists every guide. Start with the task y
 | Connect workers and choose options | [Configuration reference](docs/reference/configuration.md) |
 | Use a camera, video, or display | [Camera and video guide](docs/how-to/camera-and-video.md) |
 | Record messages and diagnostic logs | [MCAP logging guide](docs/how-to/mcap-logging.md) |
+| Stream live telemetry to Yamcs | [Yamcs guide](docs/how-to/stream-to-yamcs.md) |
 | Embed PCVMF in a Python program | [Embedding guide](docs/how-to/embedding.md) |
 | Test components without hardware | [Testing guide](docs/how-to/testing.md) |
 | Build a wheel or container | [Packaging guide](docs/how-to/packaging.md) |

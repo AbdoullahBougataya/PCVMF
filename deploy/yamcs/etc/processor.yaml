@@ -1,0 +1,35 @@
+# Processor types, trimmed from the Yamcs sample. PCVMF sends telemetry only, so there is no command releaser.
+realtime:
+  services:
+    - class: org.yamcs.StreamTmPacketProvider
+      args:
+        streams: ["tm_realtime"]
+    - class: org.yamcs.tctm.StreamParameterProvider
+      args:
+        stream: "pp_realtime"
+    - class: org.yamcs.algorithms.AlgorithmManager
+    - class: org.yamcs.parameter.LocalParameterManager
+  config:
+    subscribeAll: true
+    generateEvents: true
+    alarm:
+      parameterCheck: true
+      parameterServer: enabled
+    tmProcessor:
+      ignoreOutOfContainerEntries: false
+
+Archive:
+  services:
+    - class: org.yamcs.tctm.ReplayService
+
+ParameterArchive:
+  services:
+    - class: org.yamcs.tctm.ReplayService
+  config:
+    generateEvents: false
+
+ArchiveRetrieval:
+  services:
+    - class: org.yamcs.tctm.ReplayService
+  config:
+    generateEvents: false

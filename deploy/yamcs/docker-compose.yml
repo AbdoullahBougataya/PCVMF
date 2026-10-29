@@ -1,0 +1,21 @@
+# Yamcs for PCVMF telemetry. Start from the repository root:
+#   docker compose -f deploy/yamcs/docker-compose.yml up -d --build
+services:
+  yamcs:
+    build: .
+    ports:
+      - "127.0.0.1:8090:8090"      # web UI and HTTP/WebSocket API
+      - "127.0.0.1:10015:10015/udp" # PCVMF YamcsExporter packets
+    volumes:
+      - ./mdb:/opt/yamcs/mdb:ro
+      - yamcs-data:/storage/yamcs-data
+
+  # Later phase: Open MCT reads the same parameters through the openmct-yamcs plugin.
+  # Point it at http://yamcs:8090, instance "pcvmf", processor "realtime".
+  # openmct:
+  #   build: ../openmct
+  #   ports: ["127.0.0.1:9000:9000"]
+  #   depends_on: [yamcs]
+
+volumes:
+  yamcs-data:
